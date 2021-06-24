@@ -1,0 +1,199 @@
+name: 'Manjaro Iso Action'
+description: 'Installs prerequisites for building Manjaro on ubuntu'
+inputs:
+  iso-profiles-repo:
+    description: 'iso profiles to clone'
+    required: false
+    default: 'https://gitlab.manjaro.org/profiles-and-settings/iso-profiles'
+  edition:
+    description: 'name of the iso profile to build'
+    required: true
+  branch:
+    description: 'stable (default), testing, unstable'
+    required: false
+    default: stable
+  scope:
+    description: 'full (default) or minimal image'
+    required: false
+    default: full
+  version:
+    description: 'dist_release version'
+    required: false
+    default: "21.0"
+  kernel:
+    description: 'kernel version'
+    required: false
+    default: linux510
+  code-name:
+    description: 'manjaro code-name'
+    required: false
+    default: "Ornara"
+outputs:
+  file-pkg:
+    description: "compressed files"
+    value: ${{ steps.build.outputs.file-pkg }}
+  file-path:
+    description: "path of the generated iso"
+    value: ${{ steps.build.outputs.file-path }}
+  file-sha256:
+    description: "checksum file for the iso"
+    value: ${{ steps.build.outputs.file-sha256 }}
+runs:
+  using: "composite"
+  steps:
+    - 
+      name: install-build-dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt install \
+          gdisk \
+          zip \
+          systemd-container \
+          bmap-tools \
+          asciidoc \
+          libarchive-tools \
+          git \
+          build-essential \
+          cmake \
+          libarchive-dev \
+          pkg-config \
+          libcurl4-openssl-dev \
+          libgpgme-dev \
+          libssl-dev \
+          fakeroot \
+          dh-autoreconf \
+          haveged \
+          os-prober \
+          kwalify \
+          dosfstools \
+          libisoburn1 \
+          squashfs-tools \
+          docbook2x
+    -
+      name: install-pacman
+      shell: bash
+      env:
+        PACMAN_VERSION: 5.2.2
+      run: |
+        sudo git clone --depth 1 https://gitlab.manjaro.org/packages/core/pacman.git
+        pushd pacman
+        sudo wget https://sources.archlinux.org/other/pacman/pacman-${PACMAN_VERSION}.tar.gz
+        sudo tar -xvf pacman-${PACMAN_VERSION}.tar.gz
+        pushd pacman-${PACMAN_VERSION}
+        sudo patch -p1 -i ../pacman-sync-first-option.patch
+        sudo ./configure --prefix=/usr --sysconfdir=/etc \
+          --localstatedir=/var --enable-doc \
+          --with-scriptlet-shell=/usr/bin/bash \
+          --with-ldconfig=/usr/bin/ldconfig
+        sudo make V=1
+        sudo make install
+        popd
+        sudo install -m644 pacman.conf /etc/pacman.conf
+        sudo install -m644 makepkg.conf /etc/
+        sudo mkdir -p /etc/pacman.d
+        sudo touch /etc/pacman.d/mirrorlist
+        popd
+    -
+      name: install-keyrings
+      shell: bash
+      run: |
+        sudo git clone --depth 1 https://gitlab.manjaro.org/packages/core/manjaro-keyring.git
+        pushd manjaro-keyring
+        sudo install -dm755 /usr/share/pacman/keyrings/
+        sudo install -m0644 manjaro.gpg /usr/share/pacman/keyrings/
+        sudo install -m0644 manjaro-trusted /usr/share/pacman/keyrings/
+        sudo install -m0644 manjaro-trusted /usr/share/pacman/keyrings/
+        popd
+        
+        sudo git clone --depth 1 https://gitlab.archlinux.org/archlinux/archlinux-keyring.git
+        pushd archlinux-keyring
+        sudo install -m0644 archlinux.gpg /usr/share/pacman/keyrings/
+        sudo install -m0644 archlinux-trusted /usr/share/pacman/keyrings/
+        sudo install -m0644 archlinux-revoked /usr/share/pacman/keyrings/
+        popd
+
+        sudo pacman-key --init
+        sudo pacman-key --populate archlinux manjaro
+    -
+      name: install-arch-install-scripts
+      shell: bash
+      run: |
+        pkgver=23
+        sudo wget https://git.archlinux.org/arch-install-scripts.git/snapshot/arch-install-scripts-$pkgver.tar.gz
+        sudo tar -xvf arch-install-scripts-$pkgver.tar.gz
+        sudo make -C arch-install-scripts-$pkgver
+        sudo make -C arch-install-scripts-$pkgver check
+        sudo make -C arch-install-scripts-$pkgver PREFIX=/usr install
+        
+        sudo wget https://gitlab.manjaro.org/applications/pacman-mirrors/-/raw/v4.19x-stable/conf/pacman-mirrors.conf -O /etc/pacman-mirrors.conf
+    -
+      name: install-calamares-tools
+      shell: bash
+      run: |
+        sudo git clone --depth 1 https://gitlab.manjaro.org/applications/calamares-tools.git
+        
+        cd calamares-tools
+        sudo install -d /usr/share/calamares/
+        sudo cp -rv schemas/ /usr/share/calamares/
+    -
+      name: install-mkinitcpio
+      shell: bash
+      run: |
+        sudo wget https://git.archlinux.org/mkinitcpio.git/snapshot/mkinitcpio-29.tar.gz
+        sudo tar -xf mkinitcpio-29.tar.gz
+        sudo make -C mkinitcpio-29 install
+        sudo sed -i -e 's|File|Path|' /usr/share/libalpm/hooks/*hook
+    -
+      name: install-manjaro-tools
+      shell: bash
+      run: |
+        sudo git clone --depth 1 https://gitlab.manjaro.org/tools/development-tools/manjaro-tools.git
+        cd manjaro-tools
+        sudo make SYSCONFDIR=/etc PREFIX=/usr
+        sudo make SYSCONFDIR=/etc PREFIX=/usr install_base
+        sudo make SYSCONFDIR=/etc PREFIX=/usr install_yaml
+        sudo make SYSCONFDIR=/etc PREFIX=/usr install_iso
+    -
+      name: checkout-iso-profiles
+      shell: bash
+      env:
+        REPO: ${{ inputs.iso-profiles-repo }}
+      run: |
+        sudo git clone --depth 1 ${REPO} iso-profiles
+    -
+      id: build
+      shell: bash
+      env:
+        EDITION: ${{ inputs.edition }}
+        BRANCH: ${{ inputs.branch }}
+        SCOPE: ${{ inputs.scope }}
+        VERSION: ${{ inputs.version }}
+        KERNEL: ${{ inputs.kernel }}
+        CODE_NAME: ${{ inputs.code-name }}
+      run: |
+        [ "$SCOPE" == "minimal" ] && unset SCOPE
+
+        sudo sed -i -e 's|dist_name=$(get_distname)|dist_name=Manjaro|g' /usr/lib/manjaro-tools/util.sh
+        sudo sed -i -e 's|iso_name=$(get_osid)|iso_name=manjaro|g' /usr/lib/manjaro-tools/util.sh
+        sudo sed -i -e "s|build_mirror='https://manjaro.moson.eu'|build_mirror='https://mirror.easyname.at/manjaro'|g" /usr/lib/manjaro-tools/util.sh
+        sudo sed -i -e "s|dist_release=\$(get_release)|dist_release=$VERSION|g" /usr/lib/manjaro-tools/util.sh
+        sudo sed -i -e "s|dist_codename=\$(get_codename)|dist_codename=\"$CODE_NAME\"|g" /usr/lib/manjaro-tools/util.sh
+        
+        #sudo buildiso ${SCOPE:+-f} -p $EDITION -b $BRANCH -k $KERNEL -qv   
+        sudo buildiso ${SCOPE:+-f} -p $EDITION -b $BRANCH -k $KERNEL
+        
+        sudo rm -Rf /var/lib/manjaro-tools/buildiso/*
+        
+        FILE_PATH=$(find /var/cache/manjaro-tools/iso -type f -name "*.iso" -exec stat -c '%Y %n' {} \; | sort -nr | awk 'NR==1 {print $2}')
+        echo "::set-output name=file-path::$(basename $FILE_PATH)"
+
+        zip -j -s 1950m $(basename $FILE_PATH).zip $FILE_PATH
+        ls -lasih .
+        sha256sum $(basename $FILE_PATH).z* > $(basename $FILE_PATH).sha256
+        echo "::set-output name=file-sha256::$(basename $FILE_PATH).sha256"
+
+        FILE_PKG=$(find /var/cache/manjaro-tools/iso -type f -name "*-pkgs.txt" -exec stat -c '%Y %n' {} \; | sort -nr | awk 'NR==1 {print $2}')
+        cp -v $FILE_PKG .
+        echo "::set-output name=file-pkg::$(basename $FILE_PKG)"
+
