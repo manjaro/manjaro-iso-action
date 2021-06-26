@@ -139,10 +139,12 @@ runs:
     -
       name: install-mkinitcpio
       shell: bash
+      env:
+        VERSION: 30
       run: |
-        sudo wget https://git.archlinux.org/mkinitcpio.git/snapshot/mkinitcpio-29.tar.gz
-        sudo tar -xf mkinitcpio-29.tar.gz
-        sudo make -C mkinitcpio-29 install
+        sudo wget https://gitlab.archlinux.org/mkinitcpio/mkinitcpio/-/archive/v${VERSION}/mkinitcpio-v${VERSION}.tar.gz
+        sudo tar -xf mkinitcpio-${VERSION}.tar.gz
+        sudo make -C mkinitcpio-${VERSION} install
         sudo sed -i -e 's|File|Path|' /usr/share/libalpm/hooks/*hook
     -
       name: install-manjaro-tools
