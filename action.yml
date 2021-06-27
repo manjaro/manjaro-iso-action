@@ -1,5 +1,6 @@
 name: 'Manjaro Iso Action'
 description: 'Installs prerequisites for building Manjaro on ubuntu'
+
 inputs:
   iso-profiles-repo:
     description: 'iso profiles to clone'
@@ -28,16 +29,21 @@ inputs:
     description: 'manjaro code-name'
     required: false
     default: "Ornara"
+  release-tag:
+    description: 'release tag to upload to (if set)'
+    required: false
+
 outputs:
   file-pkg:
     description: "compressed files"
-    value: ${{ steps.build.outputs.file-pkg }}
+    value: ${{ steps.image-build.outputs.file-pkg }}
   file-path:
     description: "path of the generated iso"
-    value: ${{ steps.build.outputs.file-path }}
+    value: ${{ steps.image-build.outputs.file-path }}
   file-sha256:
     description: "checksum file for the iso"
-    value: ${{ steps.build.outputs.file-sha256 }}
+    value: ${{ steps.image-build.outputs.file-sha256 }}
+
 runs:
   using: "composite"
   steps:
@@ -165,7 +171,7 @@ runs:
       run: |
         sudo git clone --depth 1 ${REPO} iso-profiles
     -
-      id: build
+      id: image-build
       shell: bash
       env:
         EDITION: ${{ inputs.edition }}
@@ -199,4 +205,22 @@ runs:
         FILE_PKG=$(find /var/cache/manjaro-tools/iso -type f -name "*-pkgs.txt" -exec stat -c '%Y %n' {} \; | sort -nr | awk 'NR==1 {print $2}')
         cp -v $FILE_PKG .
         echo "::set-output name=file-pkg::$(basename $FILE_PKG)"
+    - 
+      id: upload-release
+      shell: bash
+      run: |
+        if [ -z ${{ inputs.release-tag }} ]; then 
+          echo "no release tag given"
+          exit 0
+        fi
+
+        echo ${{ github.token }} | gh auth login --with-token
+        gh release create ${{ inputs.release-tag }} --repo ${{ github.repository }} --notes "automated release" || echo "release already exists"
+        shopt -s extglob
+        gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
+          ./${{ steps.image-build.outputs.file-path }}.+(zip|z01) \
+          ./${{ steps.image-build.outputs.file-sha256 }} \
+          ./${{ steps.image-build.outputs.file-pkg }}
+
+
 
