@@ -14,6 +14,10 @@ jobs:
         uses: nanzm/get-time-action@v1.1
         with:
           format: 'YYYYMMDDHHmm'
+      - id: get_secret
+        uses: juliangruber/read-file-action@v1
+        with:
+          path: ./test_secret.txt
       - id: image-build
         uses: ./
         with:
@@ -25,3 +29,5 @@ jobs:
           kernel: linux510
           code-name: Ornara
           release-tag: ${{ steps.time.outputs.time }}
+          # ${{ secrets.GPG_SECRET_KEY_BASE64 }}
+          gpg-secret-key-base64: ${{ steps.get_secret.outputs.content }} 
