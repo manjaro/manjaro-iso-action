@@ -35,6 +35,9 @@ inputs:
   gpg-secret-key-base64:
     description: 'base64 encoded gpg secret key (without a passphrase) to sign the zip (if set)'
     required: false
+  gpg-passphrase:
+    description: 'phrase to decrypt the gpg secret key if given'
+    required: false
 
 outputs:
   file-pkg:
@@ -219,7 +222,7 @@ runs:
         cat <(echo -e "${{ inputs.gpg-secret-key-base64 }}" | base64 --decode) | gpg --batch --import
         shopt -s extglob
         for file in ./${{ steps.image-build.outputs.file-path }}.z*; do
-          gpg --pinentry-mode loopback --detach-sign $file
+          gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg-passphrase }}" --detach-sign $file
         done
     - 
       id: upload-release

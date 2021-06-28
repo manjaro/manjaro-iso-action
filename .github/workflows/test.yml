@@ -29,5 +29,5 @@ jobs:
           kernel: linux510
           code-name: Ornara
           release-tag: ${{ steps.time.outputs.time }}
-          # ${{ secrets.GPG_SECRET_KEY_BASE64 }}
-          gpg-secret-key-base64: ${{ steps.get_secret.outputs.content }} 
+          gpg-secret-key-base64: ${{ steps.get_secret.outputs.content }}
+          gpg-passphrase: 1234
