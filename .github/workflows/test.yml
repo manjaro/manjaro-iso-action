@@ -1,0 +1,33 @@
+name: 'build-test'
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - id: time
+        uses: nanzm/get-time-action@v1.1
+        with:
+          format: 'YYYYMMDDHHmm'
+      - id: get_secret
+        uses: juliangruber/read-file-action@v1
+        with:
+          path: ./test_secret.txt
+      - id: image-build
+        uses: ./
+        with:
+          iso-profiles-repo: https://gitlab.manjaro.org/profiles-and-settings/iso-profiles
+          edition: xfce
+          branch: stable
+          scope: minimal
+          version: "21.0"
+          kernel: linux510
+          code-name: Ornara
+          release-tag: ${{ steps.time.outputs.time }}
+          gpg-secret-key-base64: ${{ steps.get_secret.outputs.content }}
+          gpg-passphrase: 1234

@@ -1,5 +1,6 @@
 name: 'Manjaro Iso Action'
 description: 'Installs prerequisites for building Manjaro on ubuntu'
+
 inputs:
   iso-profiles-repo:
     description: 'iso profiles to clone'
@@ -28,16 +29,27 @@ inputs:
     description: 'manjaro code-name'
     required: false
     default: "Ornara"
+  release-tag:
+    description: 'release tag to upload to (if set)'
+    required: false
+  gpg-secret-key-base64:
+    description: 'base64 encoded gpg secret key (without a passphrase) to sign the zip (if set)'
+    required: false
+  gpg-passphrase:
+    description: 'phrase to decrypt the gpg secret key if given'
+    required: false
+
 outputs:
   file-pkg:
     description: "compressed files"
-    value: ${{ steps.build.outputs.file-pkg }}
+    value: ${{ steps.image-build.outputs.file-pkg }}
   file-path:
     description: "path of the generated iso"
-    value: ${{ steps.build.outputs.file-path }}
+    value: ${{ steps.image-build.outputs.file-path }}
   file-sha256:
     description: "checksum file for the iso"
-    value: ${{ steps.build.outputs.file-sha256 }}
+    value: ${{ steps.image-build.outputs.file-sha256 }}
+
 runs:
   using: "composite"
   steps:
@@ -165,7 +177,7 @@ runs:
       run: |
         sudo git clone --depth 1 ${REPO} iso-profiles
     -
-      id: build
+      id: image-build
       shell: bash
       env:
         EDITION: ${{ inputs.edition }}
@@ -194,9 +206,39 @@ runs:
         zip -j -s 1950m $(basename $FILE_PATH).zip $FILE_PATH
         ls -lasih .
         sha256sum $(basename $FILE_PATH).z* > $(basename $FILE_PATH).sha256
-        echo "::set-output name=file-sha256::$(basename $FILE_PATH).sha256"
 
         FILE_PKG=$(find /var/cache/manjaro-tools/iso -type f -name "*-pkgs.txt" -exec stat -c '%Y %n' {} \; | sort -nr | awk 'NR==1 {print $2}')
         cp -v $FILE_PKG .
         echo "::set-output name=file-pkg::$(basename $FILE_PKG)"
+    -
+      id: gpg_sign
+      shell: bash
+      run: |
+        if [ -z ${{ inputs.gpg-secret-key-base64 }} ]; then 
+          echo "no gpg secret given"
+          exit 0
+        fi
+
+        cat <(echo -e "${{ inputs.gpg-secret-key-base64 }}" | base64 --decode) | gpg --batch --import
+        shopt -s extglob
+        for file in ./${{ steps.image-build.outputs.file-path }}.z*; do
+          gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg-passphrase }}" --detach-sign $file
+        done
+    - 
+      id: upload-release
+      shell: bash
+      run: |
+        if [ -z ${{ inputs.release-tag }} ]; then 
+          echo "no release tag given"
+          exit 0
+        fi
+
+        echo ${{ github.token }} | gh auth login --with-token
+        gh release create ${{ inputs.release-tag }} --repo ${{ github.repository }} --notes "automated release" || echo "release already exists"
+        shopt -s extglob
+        gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
+          ./${{ steps.image-build.outputs.file-path }}.+(z*|sha*) \
+          ./${{ steps.image-build.outputs.file-pkg }}
+
+
 
