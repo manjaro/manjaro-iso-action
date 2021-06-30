@@ -3,6 +3,10 @@ on:
   pull_request:
     types: [closed]
 
+env:
+  version: test-release-${{ github.event.number }}
+  edition: xfce
+
 jobs:
   clean:
     runs-on: ubuntu-latest
@@ -10,8 +14,9 @@ jobs:
       - name: delete test-release for closed pr
         run: |
           echo ${{ github.token }} | gh auth login --with-token
-          gh release delete test-release-${{ github.event.number }} -y --repo ${{ github.repository }} || exit 0
+          gh release delete ${{ env.version }} -y --repo ${{ github.repository }} || exit 0
       - name: delete cdn77 test upload
         run: |
+          mkdir -p /home/runner/.ssh
           ssh-keyscan -t rsa ${{ secrets.CDN_HOST }} >> /home/runner/.ssh/known_hosts
-          sshpass -p "${{ secrets.CDN_PWD }}" ssh ${{ secrets.CDN_USER }}@${{ secrets.CDN_HOST }} rm -rf /www/xfce/test-release-${{ github.event.number }}
+          sshpass -p "${{ secrets.CDN_PWD }}" rsync --delete -vaP --stats -e ssh $(mktemp) ${{ secrets.CDN_USER }}@${{ secrets.CDN_HOST }}:/www/${{ env.edition }}/${{ env.version }}

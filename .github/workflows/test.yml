@@ -6,6 +6,7 @@ env:
   ##### EDIT ME #####
   codename: Ornara
   iso-profiles-git: https://gitlab.manjaro.org/profiles-and-settings/iso-profiles
+  version: test-release-${{ github.event.number }}
   ###################
 
 jobs:
@@ -27,12 +28,7 @@ jobs:
       - name: delete test-release
         run: |
           echo ${{ github.token }} | gh auth login --with-token
-          gh release delete test-release-${{github.event.number}} -y --repo ${{ github.repository }} || exit 0
-      - name: delete cdn77 test upload
-        run: |      
-          mkdir -p /home/runner/.ssh
-          ssh-keyscan -t rsa ${{ secrets.CDN_HOST }} >> /home/runner/.ssh/known_hosts
-          sshpass -p "${{ secrets.CDN_PWD }}" ssh ${{ secrets.CDN_USER }}@${{ secrets.CDN_HOST }} rm -rf /www/${{ matrix.edition }}/test-release-${{ github.event.number }}
+          gh release delete ${{ env.version }} -y --repo ${{ github.repository }} || exit 0
       - id: cache-key
         run: echo "::set-output name=key::package-cache-$(/bin/date -u "+%Y%U")"
         shell: bash
@@ -56,10 +52,10 @@ jobs:
           edition: ${{ matrix.edition }}
           branch: ${{ matrix.branch }}
           scope: ${{ matrix.scope }}
-          version: test-release-${{ github.event.number }}
+          version: ${{ env.version }}
           kernel: ${{ matrix.kernel }}
           code-name: ${{ env.codename }}
-          release-tag: test-release-${{ github.event.number }}
+          release-tag: ${{ env.version }}
           gpg-secret-key-base64: ${{ secrets.GPG_SECRET_KEY_BASE64 }}
           gpg-passphrase: 1234
           cdn77-host: ${{ secrets.CDN_HOST }}

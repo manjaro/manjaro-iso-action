@@ -156,8 +156,7 @@ runs:
         sudo tar -xf mkinitcpio-v${VERSION}.tar.gz
         sudo make -C mkinitcpio-v${VERSION} install
         sudo sed -i -e 's|File|Path|' /usr/share/libalpm/hooks/*hook
-    -
-      id: install-manjaro-tools
+    - id: install-manjaro-tools
       shell: bash
       run: |
         sudo git clone --depth 1 https://gitlab.manjaro.org/tools/development-tools/manjaro-tools.git
@@ -239,7 +238,7 @@ runs:
         fi
         echo "## cdn77 upload"
         ssh-keyscan -t rsa ${{ inputs.cdn77-host }} >> /home/runner/.ssh/known_hosts
-        sshpass -p "${{ inputs.cdn77-pwd }}" rsync -vaP --stats -e ssh ./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig) ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/${{ inputs.edition }}/${{ inputs.version }}
+        sshpass -p "${{ inputs.cdn77-pwd }}" rsync --delete -vaP --stats -e ssh ./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig) ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/${{ inputs.edition }}/${{ inputs.version }}
         echo "https://download.manjaro.org/xfce/${{ inputs.edition }}/${{ inputs.version }}/${{ steps.image-build.outputs.file-path }}" > ${{ steps.image-build.outputs.file-path }}.cdn77.url
     - id: upload-github-release
       shell: bash -O extglob {0}
