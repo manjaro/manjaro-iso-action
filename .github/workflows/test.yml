@@ -49,8 +49,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: |
-            /var/cache/manjaro-tools
-            !/var/cache/manjaro-tools/iso
+            /var/cache/pacman/pkg
           key: ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-${{ matrix.kernel }}-${{ matrix.scope }}
           restore-keys:  |
             ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-${{ matrix.kernel }}-${{ matrix.scope }}
