@@ -4,7 +4,7 @@ on:
 
 env:
   ##### EDIT ME #####
-  version: 21
+  version: ci-test
   codename: Ornara
   iso-profiles-git: https://gitlab.manjaro.org/profiles-and-settings/iso-profiles
   ###################
@@ -70,3 +70,6 @@ jobs:
           release-tag: ${{ needs.prepare-release.outputs.release_tag }}
           gpg-secret-key-base64: ${{ secrets.GPG_SECRET_KEY_BASE64 }}
           gpg-passphrase: 1234
+          cdn77-host: ${{ secrets.CDN_HOST }}
+          cdn77-user: ${{ secrets.CDN_USER }}
+          cdn77-pwd: ${{ secrets.CDN_PWD }}

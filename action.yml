@@ -38,6 +38,15 @@ inputs:
   gpg-passphrase:
     description: 'phrase to decrypt the gpg secret key if given'
     required: false
+  cdn77-host:
+    description: 'cdn77 upload credentials'
+    required: false
+  cdn77-user:
+    description: 'cdn77 upload credentials'
+    required: false
+  cdn77-pwd:
+    description: 'cdn77 upload credentials'
+    required: false
 
 outputs:
   file-path:
@@ -119,7 +128,7 @@ runs:
         sudo pacman-key --init
         sudo pacman-key --populate archlinux manjaro
     - id: install-arch-install-scripts
-      shell: bash -O extglob {0}
+      shell: bash
       env:
         VERSION: 24
       run: |
@@ -173,7 +182,7 @@ runs:
         KERNEL: ${{ inputs.kernel }}
         CODE_NAME: ${{ inputs.code-name }}
       run: |
-        echo "building iso"
+        echo "## building iso"
         [ "$SCOPE" == "minimal" ] && unset SCOPE
 
         sudo sed -i -e 's|dist_name=$(get_distname)|dist_name=Manjaro|g' /usr/lib/manjaro-tools/util.sh
@@ -196,29 +205,31 @@ runs:
     - id: hash
       shell: bash
       run: |
-        echo "calculating hashes"
+        echo "## calculating hashes"
         sha1sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha1
         sha256sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha256
         sha512sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha512
     - id: gpg_sign
       shell: bash
       run: |
+        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
         if [ -z "${{ inputs.gpg-secret-key-base64 }}" ]; then 
-          echo "no gpg secret given"
+          echo "## no gpg secret given"
           exit 0
         fi
-        echo "gpg signing"
+        echo "## gpg signing"
 
         cat <(echo -e "${{ inputs.gpg-secret-key-base64 }}" | base64 --decode) | gpg --batch --import
         gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg-passphrase }}" --detach-sign ./${{ steps.image-build.outputs.file-path }}
     - id: upload-github-release
       shell: bash -O extglob {0}
       run: |
+        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
         if [ -z "${{ inputs.release-tag }}" ]; then 
-          echo "no release tag given"
+          echo "## no release tag given"
           exit 0
         fi
-        echo "github upload"
+        echo "## github upload"
 
         echo ${{ github.token }} | gh auth login --with-token
         gh release create ${{ inputs.release-tag }} --repo ${{ github.repository }} --notes "automated release" || echo "release already exists"
@@ -236,7 +247,7 @@ runs:
     - id: ssh_prepare
       shell: bash
       run: |
-        echo "ssh setup"
+        echo "## ssh setup"
         mkdir -p /home/runner/.ssh
         touch /home/runner/.ssh/github_actions
         chmod 600 /home/runner/.ssh/github_actions
@@ -244,11 +255,12 @@ runs:
     - id: upload-cdn77
       shell: bash -O extglob {0}
       run: |
-        echo "cdn77 upload"
-        if [ -z ${{ inputs.cdn77-host }} || -z ${{ inputs.cdn77-user }} || -z ${{ inputs.cdn77-pwd }} ]; then 
-          echo "cdn77 not (completely) credentials given"
+        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
+        if [ -z ${{ inputs.cdn77-host }} ] || [ -z ${{ inputs.cdn77-user }} ] || [ -z ${{ inputs.cdn77-pwd }} ]; then 
+          echo "## not (all) credentials given for cdn77 upload"
           exit 0
         fi
+        echo "## cdn77 upload"
         ssh-keyscan -t rsa ${{ inputs.cdn77-host }} >> /home/runner/.ssh/known_hosts
         sshpass -p "${{ inputs.cdn77-pwd }}" rsync -vaP --stats -e ssh ./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig) ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/${{ matrix.EDITION }}/${{ inputs.version }}
 
