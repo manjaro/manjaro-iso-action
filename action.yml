@@ -47,6 +47,15 @@ inputs:
   cdn77-pwd:
     description: 'cdn77 upload credentials'
     required: false
+  sf-project:
+    description: 'sf upload credentials'
+    required: false
+  sf-user:
+    description: 'sf upload credentials'
+    required: false
+  sf-key:
+    description: 'sf upload credentials'
+    required: false
 
 outputs:
   file-path:
@@ -221,7 +230,7 @@ runs:
         cat <(echo -e "${{ inputs.gpg-secret-key-base64 }}" | base64 --decode) | gpg --batch --import
         gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg-passphrase }}" --detach-sign ./${{ steps.image-build.outputs.file-path }}
     - id: ssh_prepare
-      shell: bash
+      shell: bash -O extglob {0}
       run: |
         echo "## ssh setup"
         mkdir -p /home/runner/.ssh
@@ -229,7 +238,7 @@ runs:
         chmod 600 /home/runner/.ssh/github_actions
         ssh-agent -a /tmp/ssh_agent.sock > /dev/null
     - id: upload-cdn77
-      shell: bash -O extglob {0}
+      shell: bash
       run: |
         # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
         if [ -z ${{ inputs.cdn77-host }} ] || [ -z ${{ inputs.cdn77-user }} ] || [ -z ${{ inputs.cdn77-pwd }} ]; then 
@@ -243,9 +252,26 @@ runs:
           -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}
         
         ssh-keyscan -t rsa ${{ inputs.cdn77-host }} >> /home/runner/.ssh/known_hosts
-        sshpass -p "${{ inputs.cdn77-pwd }}" rsync --delete --mkpath -vaP \
+        sshpass -p "${{ inputs.cdn77-pwd }}" rsync -rvvaP \
           --stats -e ssh ./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig|.torrent) \
-          ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/${{ inputs.edition }}/${{ inputs.version }}/
+          ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/${{ inputs.editon }}/${{ inputs.version }}/
+    - id: upload-sourceforge
+      shell: bash -O extglob {0}
+      run: |
+        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
+        if [ -z ${{ inputs.sf-project }} ] || [ -z ${{ inputs.sf-user }} ] || [ -z ${{ inputs.sf-key }} ]; then 
+          echo "## not (all) credentials given for sourceforge upload"
+          exit 0
+        fi
+        echo "## sourceforge upload"
+        
+        ssh-keyscan -t rsa frs.sourceforge.net >> /home/runner/.ssh/known_hosts
+        echo "${{ inputs.sf-key }}" >> /home/runner/.ssh/github_actions
+        ssh-add /home/runner/.ssh/github_actions
+
+        rsync -rvvaP \
+          --stats -e ssh ./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig|.torrent) \
+          ${{ inputs.sf-user }}@frs.sourceforge.net:/home/frs/project/${{ inputs.sf-project }}/
     - id: upload-github-release
       shell: bash -O extglob {0}
       run: |

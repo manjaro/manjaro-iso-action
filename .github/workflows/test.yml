@@ -67,6 +67,9 @@ jobs:
           cdn77-host: ${{ secrets.CDN_HOST }}
           cdn77-user: ${{ secrets.CDN_USER }}
           cdn77-pwd: ${{ secrets.CDN_PWD }}
+          sf-project: manjarolinux
+          sf-user: ${{ secrets.SF_USER_NAME }}
+          sf-key: ${{ secrets.SF_PRIV_SSHKEY }}
       - id: copy-cache-target-to-cache
         run: |
           mkdir -p package-cache
