@@ -14,4 +14,4 @@ jobs:
       - name: delete cdn77 test upload
         run: |
           ssh-keyscan -t rsa ${{ secrets.CDN_HOST }} >> /home/runner/.ssh/known_hosts
-          sshpass -p "${{ secrets.CDN_PWD }}" -e ssh ${{ secrets.CDN_USER }}@${{ secrets.CDN_HOST }} rm -rf /www/xfce/test-release-${{ github.event.number }}
+          sshpass -p "${{ secrets.CDN_PWD }}" ssh ${{ secrets.CDN_USER }}@${{ secrets.CDN_HOST }} rm -rf /www/xfce/test-release-${{ github.event.number }}

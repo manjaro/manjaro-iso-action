@@ -30,20 +30,25 @@ jobs:
           gh release delete test-release-${{github.event.number}} -y --repo ${{ github.repository }} || exit 0
       - name: delete cdn77 test upload
         run: |      
+          mkdir -p /home/runner/.ssh
+          ssh-keyscan -t rsa ${{ secrets.CDN_HOST }} >> /home/runner/.ssh/known_hosts
+          sshpass -p "${{ secrets.CDN_PWD }}" ssh ${{ secrets.CDN_USER }}@${{ secrets.CDN_HOST }} rm -rf /www/${{ matrix.edition }}/test-release-${{ github.event.number }}
       - id: cache-key
-        run: echo "::set-output name=key::$(/bin/date -u "+%Y%U")"
+        run: echo "::set-output name=key::package-cache-$(/bin/date -u "+%Y%U")"
         shell: bash
-      - name: cache
+      - id: cache
         uses: actions/cache@v2
         with:
-          path: |
-            /var/cache/pacman/pkg
+          path: package-cache
           key: ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-${{ matrix.kernel }}-${{ matrix.scope }}
           restore-keys:  |
             ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-${{ matrix.kernel }}-${{ matrix.scope }}
             ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-${{ matrix.kernel }}-
             ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-
             ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-
+      - id: copy-cache-to-target
+        if: ${{ steps.cache.outputs.cache-hit == 'true' }}
+        run: sudo cp --verbose --force --recursive ./package-cache/* /var/cache/pacman/pkg
       - id: image-build
         uses: ./
         with:
@@ -60,3 +65,7 @@ jobs:
           cdn77-host: ${{ secrets.CDN_HOST }}
           cdn77-user: ${{ secrets.CDN_USER }}
           cdn77-pwd: ${{ secrets.CDN_PWD }}
+      - id: copy-cache-target-to-cache
+        run: |
+          mkdir -p package-cache
+          sudo cp --verbose --force --recursive /var/cache/pacman/pkg/* ./package-cache
