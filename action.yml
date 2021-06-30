@@ -182,6 +182,7 @@ runs:
         KERNEL: ${{ inputs.kernel }}
         CODE_NAME: ${{ inputs.code-name }}
       run: |
+        echo "building iso"
         [ "$SCOPE" == "minimal" ] && unset SCOPE
 
         sudo sed -i -e 's|dist_name=$(get_distname)|dist_name=Manjaro|g' /usr/lib/manjaro-tools/util.sh
@@ -190,7 +191,6 @@ runs:
         sudo sed -i -e "s|dist_release=\$(get_release)|dist_release=$VERSION|g" /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e "s|dist_codename=\$(get_codename)|dist_codename=\"$CODE_NAME\"|g" /usr/lib/manjaro-tools/util.sh
         
-        #sudo buildiso ${SCOPE:+-f} -p $EDITION -b $BRANCH -k $KERNEL -qv   
         sudo buildiso ${SCOPE:+-f} -p $EDITION -b $BRANCH -k $KERNEL
         
         sudo rm -Rf /var/lib/manjaro-tools/buildiso/*
@@ -205,16 +205,18 @@ runs:
     - id: hash
       shell: bash
       run: |
+        echo "calculating hashes"
         sha1sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha1
         sha256sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha256
         sha512sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha512
     - id: gpg_sign
       shell: bash
       run: |
-        if [ -z ${{ inputs.gpg-secret-key-base64 }} ]; then 
+        if [ -z "${{ inputs.gpg-secret-key-base64 }}" ]; then 
           echo "no gpg secret given"
           exit 0
         fi
+        echo "gpg signing"
 
         cat <(echo -e "${{ inputs.gpg-secret-key-base64 }}" | base64 --decode) | gpg --batch --import
         gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg-passphrase }}" --detach-sign ./${{ steps.image-build.outputs.file-path }}
@@ -222,10 +224,11 @@ runs:
       shell: bash
       run: |
         shopt -s extglob
-        if [ -z ${{ inputs.release-tag }} ]; then 
+        if [ -z "${{ inputs.release-tag }}" ]; then 
           echo "no release tag given"
           exit 0
         fi
+        echo "github upload"
 
         echo ${{ github.token }} | gh auth login --with-token
         gh release create ${{ inputs.release-tag }} --repo ${{ github.repository }} --notes "automated release" || echo "release already exists"
@@ -236,13 +239,14 @@ runs:
             ./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig)
         else
           # iso is too big - creating a split-zip
-          zip -j -s 1950m ${{ steps.image-build.outputs.file-path }}.zip
+          zip -j -s 1950m ${{ steps.image-build.outputs.file-path }}.zip ${{ steps.image-build.outputs.file-path }}
           gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
             ./${{ steps.image-build.outputs.file-path }}+(z*|.sha*|.pkgs|.sig)
         fi
     - id: ssh_prepare
       shell: bash
       run: |
+        echo "ssh setup"
         mkdir -p /home/runner/.ssh
         touch /home/runner/.ssh/github_actions
         chmod 600 /home/runner/.ssh/github_actions
@@ -250,6 +254,7 @@ runs:
     - id: upload-cdn77
       shell: bash
       run: |
+        echo "cdn77 upload"
         shopt -s extglob
         if [ -z ${{ inputs.cdn77-host }} || -z ${{ inputs.cdn77-user }} || -z ${{ inputs.cdn77-pwd }} ]; then 
           echo "cdn77 not (completely) credentials given"
