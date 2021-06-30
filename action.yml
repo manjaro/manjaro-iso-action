@@ -209,11 +209,6 @@ runs:
         sha1sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha1
         sha256sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha256
         sha512sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha512
-    - id: mktorrent
-      shell: bash
-      run: |
-        mktorrent -v -a udp://tracker.opentrackr.org:1337 -l 21 -w https://download.manjaro.org/$EDITION/$VERSION/$(basename $FILE_PATH) -o $(basename $FILE_PATH).torrent $(basename $FILE_PATH)
-
     - id: gpg_sign
       shell: bash
       run: |
@@ -223,7 +218,6 @@ runs:
           exit 0
         fi
         echo "## gpg signing"
-
         cat <(echo -e "${{ inputs.gpg-secret-key-base64 }}" | base64 --decode) | gpg --batch --import
         gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg-passphrase }}" --detach-sign ./${{ steps.image-build.outputs.file-path }}
     - id: ssh_prepare
@@ -243,13 +237,13 @@ runs:
           exit 0
         fi
         echo "## cdn77 upload"
-        ssh-keyscan -t rsa ${{ inputs.cdn77-host }} >> /home/runner/.ssh/known_hosts
-
+        
         mktorrent -v -a udp://tracker.opentrackr.org:1337 -l 21 \
           -w "https://download.manjaro.org/${{ inputs.edition }}/${{ inputs.version }}/${{ steps.image-build.outputs.file-path }}" \
           -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}
-
-        sshpass -p "${{ inputs.cdn77-pwd }}" rsync --delete -vaP \
+        
+        ssh-keyscan -t rsa ${{ inputs.cdn77-host }} >> /home/runner/.ssh/known_hosts
+        sshpass -p "${{ inputs.cdn77-pwd }}" rsync --delete --mkpath -vaP \
           --stats -e ssh ./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig|.torrent) \
           ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/${{ inputs.edition }}/${{ inputs.version }}/
     - id: upload-github-release
