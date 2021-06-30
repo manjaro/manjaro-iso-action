@@ -83,7 +83,8 @@ runs:
           dosfstools \
           libisoburn1 \
           squashfs-tools \
-          docbook2x
+          docbook2x \
+          mktorrent
     - id: install-pacman
       shell: bash
       env:
@@ -208,6 +209,11 @@ runs:
         sha1sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha1
         sha256sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha256
         sha512sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha512
+    - id: mktorrent
+      shell: bash
+      run: |
+        mktorrent -v -a udp://tracker.opentrackr.org:1337 -l 21 -w https://download.manjaro.org/$EDITION/$VERSION/$(basename $FILE_PATH) -o $(basename $FILE_PATH).torrent $(basename $FILE_PATH)
+
     - id: gpg_sign
       shell: bash
       run: |
@@ -238,8 +244,14 @@ runs:
         fi
         echo "## cdn77 upload"
         ssh-keyscan -t rsa ${{ inputs.cdn77-host }} >> /home/runner/.ssh/known_hosts
-        sshpass -p "${{ inputs.cdn77-pwd }}" rsync --delete -vaP --stats -e ssh ./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig) ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/${{ inputs.edition }}/${{ inputs.version }}
-        echo "https://download.manjaro.org/xfce/${{ inputs.edition }}/${{ inputs.version }}/${{ steps.image-build.outputs.file-path }}" > ${{ steps.image-build.outputs.file-path }}.cdn77.url
+
+        mktorrent -v -a udp://tracker.opentrackr.org:1337 -l 21 \
+          -w "https://download.manjaro.org/${{ inputs.edition }}/${{ inputs.version }}/${{ steps.image-build.outputs.file-path }}" \
+          -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}
+
+        sshpass -p "${{ inputs.cdn77-pwd }}" rsync --delete -vaP \
+          --stats -e ssh ./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig|.torrent) \
+          ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/${{ inputs.edition }}/${{ inputs.version }}/
     - id: upload-github-release
       shell: bash -O extglob {0}
       run: |
@@ -256,12 +268,12 @@ runs:
         if [[ -z "$(du --threshold=1950M ${{ steps.image-build.outputs.file-path }})" ]]; then
           # iso is small enough to upload already
           gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
-            ./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig)
+            ./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig|.torrent)
         else
           # iso is too big - creating a split-zip
           zip -j -s 1950m ${{ steps.image-build.outputs.file-path }}.zip ${{ steps.image-build.outputs.file-path }}
           gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
-            ./${{ steps.image-build.outputs.file-path }}+(.z*|.sha*|.pkgs|.sig|.*.url)
+            ./${{ steps.image-build.outputs.file-path }}+(.z*|.sha*|.pkgs|.sig|.torrent)
         fi
 
 

@@ -44,7 +44,9 @@ jobs:
             ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-
       - id: copy-cache-to-target
         if: ${{ steps.cache.outputs.cache-hit == 'true' }}
-        run: sudo cp --verbose --force --recursive ./package-cache/* /var/cache/pacman/pkg
+        run: |
+          sudo mkdir -p /var/cache/pacman/pkg
+          sudo cp -fr ./package-cache/* /var/cache/pacman/pkg/
       - id: image-build
         uses: ./
         with:
