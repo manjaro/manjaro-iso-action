@@ -3,9 +3,11 @@ on:
   pull_request:
 
 env:
+  ##### EDIT ME #####
   version: 21
   codename: Ornara
   iso-profiles-git: https://gitlab.manjaro.org/profiles-and-settings/iso-profiles
+  ###################
 
 jobs:
   prepare-release:
@@ -25,10 +27,12 @@ jobs:
     needs: [prepare-release]
     strategy:
       matrix:
+        ##### EDIT ME #####
         EDITION: [xfce]
         BRANCH: [stable]
         SCOPE: [full, minimal]
         KERNEL: [linux510]
+        ###################
     steps:
       - uses: styfle/cancel-workflow-action@0.9.0
         with:
