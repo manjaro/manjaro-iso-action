@@ -50,11 +50,13 @@ outputs:
     description: "checksum file for the iso"
     value: ${{ steps.image-build.outputs.file-sha256 }}
 
+env:
+  SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+
 runs:
   using: "composite"
   steps:
-    - 
-      name: install-build-dependencies
+    - id: install-build-dependencies
       shell: bash
       run: |
         sudo apt-get update
@@ -82,8 +84,7 @@ runs:
           libisoburn1 \
           squashfs-tools \
           docbook2x
-    -
-      name: install-pacman
+    - id: install-pacman
       shell: bash
       env:
         PACMAN_VERSION: 5.2.2
@@ -106,8 +107,7 @@ runs:
         sudo mkdir -p /etc/pacman.d
         sudo touch /etc/pacman.d/mirrorlist
         popd
-    -
-      name: install-keyrings
+    - id: install-keyrings
       shell: bash
       run: |
         sudo git clone --depth 1 https://gitlab.manjaro.org/packages/core/manjaro-keyring.git
@@ -127,8 +127,7 @@ runs:
 
         sudo pacman-key --init
         sudo pacman-key --populate archlinux manjaro
-    -
-      name: install-arch-install-scripts
+    - id: install-arch-install-scripts
       shell: bash
       env:
         VERSION: 24
@@ -140,8 +139,7 @@ runs:
         sudo make -C arch-install-scripts-${VERSION} PREFIX=/usr install
         
         sudo wget https://gitlab.manjaro.org/applications/pacman-mirrors/-/raw/v4.19x-stable/conf/pacman-mirrors.conf -O /etc/pacman-mirrors.conf
-    -
-      name: install-calamares-tools
+    - id: install-calamares-tools
       shell: bash
       run: |
         sudo git clone --depth 1 https://gitlab.manjaro.org/applications/calamares-tools.git
@@ -149,8 +147,7 @@ runs:
         cd calamares-tools
         sudo install -d /usr/share/calamares/
         sudo cp -rv schemas/ /usr/share/calamares/
-    -
-      name: install-mkinitcpio
+    - id: install-mkinitcpio
       shell: bash
       env:
         VERSION: 30
@@ -160,7 +157,7 @@ runs:
         sudo make -C mkinitcpio-v${VERSION} install
         sudo sed -i -e 's|File|Path|' /usr/share/libalpm/hooks/*hook
     -
-      name: install-manjaro-tools
+      id: install-manjaro-tools
       shell: bash
       run: |
         sudo git clone --depth 1 https://gitlab.manjaro.org/tools/development-tools/manjaro-tools.git
@@ -169,15 +166,13 @@ runs:
         sudo make SYSCONFDIR=/etc PREFIX=/usr install_base
         sudo make SYSCONFDIR=/etc PREFIX=/usr install_yaml
         sudo make SYSCONFDIR=/etc PREFIX=/usr install_iso
-    -
-      name: checkout-iso-profiles
+    - id: checkout-iso-profiles
       shell: bash
       env:
         REPO: ${{ inputs.iso-profiles-repo }}
       run: |
         sudo git clone --depth 1 ${REPO} iso-profiles
-    -
-      id: image-build
+    - id: image-build
       shell: bash
       env:
         EDITION: ${{ inputs.edition }}
@@ -207,15 +202,13 @@ runs:
 
         FILE_PKG=$(find /var/cache/manjaro-tools/iso -type f -name "*-pkgs.txt" -exec stat -c '%Y %n' {} \; | sort -nr | awk 'NR==1 {print $2}')
         mv $FILE_PKG ./${TARGET_ISO_PATH}.pkgs
-    -
-      id: hash
+    - id: hash
       shell: bash
       run: |
         sha1sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha1
         sha256sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha256
         sha512sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha512
-    -
-      id: gpg_sign
+    - id: gpg_sign
       shell: bash
       run: |
         if [ -z ${{ inputs.gpg-secret-key-base64 }} ]; then 
@@ -225,8 +218,7 @@ runs:
 
         cat <(echo -e "${{ inputs.gpg-secret-key-base64 }}" | base64 --decode) | gpg --batch --import
         gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg-passphrase }}" --detach-sign ./${{ steps.image-build.outputs.file-path }}
-    - 
-      id: upload-github-release
+    - id: upload-github-release
       shell: bash
       run: |
         shopt -s extglob
@@ -241,16 +233,34 @@ runs:
         if [[ -z "$(du --threshold=1950M ${{ steps.image-build.outputs.file-path }})" ]]; then
           # iso is small enough to upload already
           gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
-            ./${{ steps.image-build.outputs.file-path }}
+            ./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig)
         else
           # iso is too big - creating a split-zip
           zip -j -s 1950m ${{ steps.image-build.outputs.file-path }}.zip
           gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
-            ./${{ steps.image-build.outputs.file-path }}.+z*
+            ./${{ steps.image-build.outputs.file-path }}+(z*|.sha*|.pkgs|.sig)
         fi
+    - id: ssh_prepare
+      shell: bash
+      run: |
+        mkdir -p /home/runner/.ssh
+        touch /home/runner/.ssh/github_actions
+        chmod 600 /home/runner/.ssh/github_actions
+        ssh-agent -a $SSH_AUTH_SOCK > /dev/null
+    - id: upload-cdn77
+      shell: bash
+      run: |
+        shopt -s extglob
+        if [ -z ${{ inputs.cdn77-host }} || -z ${{ inputs.cdn77-user }} || -z ${{ inputs.cdn77-pwd }} ]; then 
+          echo "cdn77 not (completely) credentials given"
+          exit 0
+        fi
+        ssh-keyscan -t rsa ${{ inputs.cdn77-host }} >> /home/runner/.ssh/known_hosts
+        sshpass -p "${{ inputs.cdn77-pwd }}" rsync -vaP --stats -e ssh ./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig) ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/${{ matrix.EDITION }}/${{ inputs.version }}
 
-        gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \        
-          ./${{ steps.image-build.outputs.file-path }}.+(sha*|pkgs) \
+
+
+
 
 
 
