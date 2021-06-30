@@ -4,27 +4,13 @@ on:
 
 env:
   ##### EDIT ME #####
-  version: ci-test
   codename: Ornara
   iso-profiles-git: https://gitlab.manjaro.org/profiles-and-settings/iso-profiles
   ###################
 
 jobs:
-  prepare-release:
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: styfle/cancel-workflow-action@0.9.0
-        with:
-          access_token: ${{ github.token }}
-      - id: time
-        uses: nanzm/get-time-action@v1.1
-        with:
-          format: 'YYYYMMDDHHmm'
-    outputs:
-      release_tag: ${{ steps.time.outputs.time }}
   build-release:
     runs-on: ubuntu-20.04
-    needs: [prepare-release]
     strategy:
       matrix:
         ##### EDIT ME #####
@@ -63,10 +49,10 @@ jobs:
           edition: ${{ matrix.edition }}
           branch: ${{ matrix.branch }}
           scope: ${{ matrix.scope }}
-          version: ${{ env.version }}
+          version: test-release-${{github.event.number}}
           kernel: ${{ matrix.kernel }}
           code-name: ${{ env.codename }}
-          release-tag: ${{ needs.prepare-release.outputs.release_tag }}
+          release-tag: test-release-${{github.event.number}}
           gpg-secret-key-base64: ${{ secrets.GPG_SECRET_KEY_BASE64 }}
           gpg-passphrase: 1234
           cdn77-host: ${{ secrets.CDN_HOST }}
