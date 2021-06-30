@@ -3,8 +3,26 @@ on:
   pull_request:
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  prepare-release:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: styfle/cancel-workflow-action@0.9.0
+        with:
+          access_token: ${{ github.token }}
+      - id: time
+        uses: nanzm/get-time-action@v1.1
+        with:
+          format: 'YYYYMMDDHHmm'
+    outputs:
+      release_tag: ${{ steps.time.outputs.time }}
+  build-release:
+    runs-on: ubuntu-20.04
+    needs: [prepare-release]
+    strategy:
+      matrix:
+        EDITION: [xfce]
+        BRANCH: [stable]
+        SCOPE: [full, minimal]
     steps:
       - uses: styfle/cancel-workflow-action@0.9.0
         with:
@@ -28,12 +46,12 @@ jobs:
         uses: ./
         with:
           iso-profiles-repo: https://gitlab.manjaro.org/profiles-and-settings/iso-profiles
-          edition: xfce
-          branch: stable
-          scope: minimal
+          edition: ${{ matrix.edition }}
+          branch: ${{ matrix.branch }}
+          scope: ${{ matrix.scope }}
           version: "21.0"
           kernel: linux510
           code-name: Ornara
-          release-tag: test-release-${{github.event.number}}
+          release-tag: ${{ needs.prepare-release.outputs.release_tag }}
           gpg-secret-key-base64: ${{ secrets.GPG_SECRET_KEY_BASE64 }}
           gpg-passphrase: 1234
