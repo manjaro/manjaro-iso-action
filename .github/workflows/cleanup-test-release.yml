@@ -10,4 +10,8 @@ jobs:
       - name: delete test-release for closed pr
         run: |
           echo ${{ github.token }} | gh auth login --with-token
-          gh release delete test-release-${{github.event.number}} -y --repo ${{ github.repository }} || exit 0
+          gh release delete test-release-${{ github.event.number }} -y --repo ${{ github.repository }} || exit 0
+      - name: delete cdn77 test upload
+        run: |
+          ssh-keyscan -t rsa ${{ secrets.CDN_HOST }} >> /home/runner/.ssh/known_hosts
+          sshpass -p "${{ secrets.CDN_PWD }}" -e ssh ${{ secrets.CDN_USER }}@${{ secrets.CDN_HOST }} rm -rf /www/xfce/test-release-${{ github.event.number }}

@@ -28,6 +28,8 @@ jobs:
         run: |
           echo ${{ github.token }} | gh auth login --with-token
           gh release delete test-release-${{github.event.number}} -y --repo ${{ github.repository }} || exit 0
+      - name: delete cdn77 test upload
+        run: |      
       - id: cache-key
         run: echo "::set-output name=key::$(/bin/date -u "+%Y%U")"
         shell: bash
@@ -49,10 +51,10 @@ jobs:
           edition: ${{ matrix.edition }}
           branch: ${{ matrix.branch }}
           scope: ${{ matrix.scope }}
-          version: test-release-${{github.event.number}}
+          version: test-release-${{ github.event.number }}
           kernel: ${{ matrix.kernel }}
           code-name: ${{ env.codename }}
-          release-tag: test-release-${{github.event.number}}
+          release-tag: test-release-${{ github.event.number }}
           gpg-secret-key-base64: ${{ secrets.GPG_SECRET_KEY_BASE64 }}
           gpg-passphrase: 1234
           cdn77-host: ${{ secrets.CDN_HOST }}
