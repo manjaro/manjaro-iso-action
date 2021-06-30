@@ -47,7 +47,12 @@ jobs:
           path: |
             /var/cache/manjaro-tools
             !/var/cache/manjaro-tools/iso
-          key: ${{ runner.os }}-${{ steps.cache-key.outputs.key }}
+          key: ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-${{ matrix.kernel }}-${{ matrix.scope }}
+          restore-keys:  |
+            ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-${{ matrix.kernel }}-${{ matrix.scope }}
+            ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-${{ matrix.kernel }}-
+            ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-
+            ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-
       - id: image-build
         uses: ./
         with:
