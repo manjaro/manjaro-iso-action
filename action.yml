@@ -200,16 +200,18 @@ runs:
         
         sudo rm -Rf /var/lib/manjaro-tools/buildiso/*
         
-        FILE_PATH=$(find /var/cache/manjaro-tools/iso -type f -name "*.iso" -exec stat -c '%Y %n' {} \; | sort -nr | awk 'NR==1 {print $2}')
-        echo "::set-output name=file-path::$(basename $FILE_PATH)"
-
-        zip -j -s 1950m $(basename $FILE_PATH).zip $FILE_PATH
-        ls -lasih .
-        sha256sum $(basename $FILE_PATH).z* > $(basename $FILE_PATH).sha256
+        OUTPUT_ISO_PATH=$(find /var/cache/manjaro-tools/iso -type f -name "*.iso" -exec stat -c '%Y %n' {} \; | sort -nr | awk 'NR==1 {print $2}')
+        TARGET_ISO_PATH=$(basename $OUTPUT_ISO_PATH)
+        mv $OUTPUT_ISO_PATH ./$TARGET_ISO_PATH
+        echo "::set-output name=file-path::$TARGET_ISO_PATH"
 
         FILE_PKG=$(find /var/cache/manjaro-tools/iso -type f -name "*-pkgs.txt" -exec stat -c '%Y %n' {} \; | sort -nr | awk 'NR==1 {print $2}')
-        cp -v $FILE_PKG .
-        echo "::set-output name=file-pkg::$(basename $FILE_PKG)"
+        mv $FILE_PKG ./${TARGET_ISO_PATH}.pkgs
+    -
+      id: hash
+      shell: bash
+      run: |
+        sha256sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha256
     -
       id: gpg_sign
       shell: bash
@@ -220,14 +222,12 @@ runs:
         fi
 
         cat <(echo -e "${{ inputs.gpg-secret-key-base64 }}" | base64 --decode) | gpg --batch --import
-        shopt -s extglob
-        for file in ./${{ steps.image-build.outputs.file-path }}.z*; do
-          gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg-passphrase }}" --detach-sign $file
-        done
+        gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg-passphrase }}" --detach-sign ./${{ steps.image-build.outputs.file-path }}.iso
     - 
-      id: upload-release
+      id: upload-github-release
       shell: bash
       run: |
+        shopt -s extglob
         if [ -z ${{ inputs.release-tag }} ]; then 
           echo "no release tag given"
           exit 0
@@ -235,10 +235,20 @@ runs:
 
         echo ${{ github.token }} | gh auth login --with-token
         gh release create ${{ inputs.release-tag }} --repo ${{ github.repository }} --notes "automated release" || echo "release already exists"
-        shopt -s extglob
-        gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
-          ./${{ steps.image-build.outputs.file-path }}.+(z*|sha*) \
-          ./${{ steps.image-build.outputs.file-pkg }}
+
+        if [[ -z "$(du --threshold=1950M ${{ steps.image-build.outputs.file-path }})" ]]; then
+          # iso is small enough to upload already
+          gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
+            ./${{ steps.image-build.outputs.file-path }}
+        else
+          # iso is too big - creating a split-zip
+          zip -j -s 1950m ${{ steps.image-build.outputs.file-path }}.zip
+          gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
+            ./${{ steps.image-build.outputs.file-path }}.+z*
+        fi
+
+        gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \        
+          ./${{ steps.image-build.outputs.file-path }}.+(sha*|pkgs) \
 
 
 
