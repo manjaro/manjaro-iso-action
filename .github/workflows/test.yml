@@ -2,6 +2,11 @@ name: 'build-test'
 on:
   pull_request:
 
+env:
+  version: 21
+  codename: Ornara
+  iso-profiles-git: https://gitlab.manjaro.org/profiles-and-settings/iso-profiles
+
 jobs:
   prepare-release:
     runs-on: ubuntu-20.04
@@ -23,6 +28,7 @@ jobs:
         EDITION: [xfce]
         BRANCH: [stable]
         SCOPE: [full, minimal]
+        KERNEL: [linux510]
     steps:
       - uses: styfle/cancel-workflow-action@0.9.0
         with:
@@ -45,13 +51,13 @@ jobs:
       - id: image-build
         uses: ./
         with:
-          iso-profiles-repo: https://gitlab.manjaro.org/profiles-and-settings/iso-profiles
+          iso-profiles-repo: ${{ env.iso-profiles-git }}
           edition: ${{ matrix.edition }}
           branch: ${{ matrix.branch }}
           scope: ${{ matrix.scope }}
-          version: "21.0"
-          kernel: linux510
-          code-name: Ornara
+          version: ${{ env.version }}
+          kernel: ${{ matrix.kernel }}
+          code-name: ${{ env.codename }}
           release-tag: ${{ needs.prepare-release.outputs.release_tag }}
           gpg-secret-key-base64: ${{ secrets.GPG_SECRET_KEY_BASE64 }}
           gpg-passphrase: 1234
