@@ -14,6 +14,16 @@ jobs:
         run: |
           echo ${{ github.token }} | gh auth login --with-token
           gh release delete test-release-${{github.event.number}} -y --repo ${{ github.repository }} || exit 0
+      - id: cache-key
+        run: echo "::set-output name=key::$(/bin/date -u "+%Y%U")"
+        shell: bash
+      - name: cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            /var/cache/manjaro-tools
+            !/var/cache/manjaro-tools/iso
+          key: ${{ runner.os }}-${{ steps.cache-key.outputs.key }}
       - id: image-build
         uses: ./
         with:
