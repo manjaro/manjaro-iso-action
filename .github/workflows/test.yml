@@ -35,7 +35,9 @@ jobs:
       - id: cache
         uses: actions/cache@v2
         with:
-          path: package-cache
+          path: |
+            package-cache
+            apt-cache
           key: ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-${{ matrix.kernel }}-${{ matrix.scope }}
           restore-keys:  |
             ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-${{ matrix.kernel }}-${{ matrix.scope }}
@@ -47,6 +49,8 @@ jobs:
         run: |
           sudo mkdir -p /var/cache/pacman/pkg
           sudo cp -fr ./package-cache/* /var/cache/pacman/pkg/
+          sudo mkdir -p /var/cache/apt
+          sudo cp -fr ./apt-cache/* /var/cache/apt/
       - id: image-build
         uses: ./
         with:
@@ -67,3 +71,4 @@ jobs:
         run: |
           mkdir -p package-cache
           sudo cp --verbose --force --recursive /var/cache/pacman/pkg/* ./package-cache
+          sudo cp --verbose --force --recursive /var/cache/apt/* ./apt-cache
