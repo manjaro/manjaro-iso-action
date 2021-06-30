@@ -40,18 +40,9 @@ inputs:
     required: false
 
 outputs:
-  file-pkg:
-    description: "compressed files"
-    value: ${{ steps.image-build.outputs.file-pkg }}
   file-path:
     description: "path of the generated iso"
     value: ${{ steps.image-build.outputs.file-path }}
-  file-sha256:
-    description: "checksum file for the iso"
-    value: ${{ steps.image-build.outputs.file-sha256 }}
-
-env:
-  SSH_AUTH_SOCK: /tmp/ssh_agent.sock
 
 runs:
   using: "composite"
@@ -128,7 +119,7 @@ runs:
         sudo pacman-key --init
         sudo pacman-key --populate archlinux manjaro
     - id: install-arch-install-scripts
-      shell: bash
+      shell: bash -O extglob {0}
       env:
         VERSION: 24
       run: |
@@ -221,9 +212,8 @@ runs:
         cat <(echo -e "${{ inputs.gpg-secret-key-base64 }}" | base64 --decode) | gpg --batch --import
         gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg-passphrase }}" --detach-sign ./${{ steps.image-build.outputs.file-path }}
     - id: upload-github-release
-      shell: bash
+      shell: bash -O extglob {0}
       run: |
-        shopt -s extglob
         if [ -z "${{ inputs.release-tag }}" ]; then 
           echo "no release tag given"
           exit 0
@@ -250,22 +240,17 @@ runs:
         mkdir -p /home/runner/.ssh
         touch /home/runner/.ssh/github_actions
         chmod 600 /home/runner/.ssh/github_actions
-        ssh-agent -a $SSH_AUTH_SOCK > /dev/null
+        ssh-agent -a /tmp/ssh_agent.sock > /dev/null
     - id: upload-cdn77
-      shell: bash
+      shell: bash -O extglob {0}
       run: |
         echo "cdn77 upload"
-        shopt -s extglob
         if [ -z ${{ inputs.cdn77-host }} || -z ${{ inputs.cdn77-user }} || -z ${{ inputs.cdn77-pwd }} ]; then 
           echo "cdn77 not (completely) credentials given"
           exit 0
         fi
         ssh-keyscan -t rsa ${{ inputs.cdn77-host }} >> /home/runner/.ssh/known_hosts
         sshpass -p "${{ inputs.cdn77-pwd }}" rsync -vaP --stats -e ssh ./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig) ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/${{ matrix.EDITION }}/${{ inputs.version }}
-
-
-
-
 
 
 
