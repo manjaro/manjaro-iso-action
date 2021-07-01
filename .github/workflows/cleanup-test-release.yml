@@ -1,10 +1,15 @@
 name: 'cleanup-test-release'
 on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'pr to delete assets for'
+        required: true
   pull_request:
     types: [closed]
 
 env:
-  version: test-release-${{ github.event.number }}
+  version: test-release-${{ github.event.inputs.pr_number || github.event.number }}
   edition: xfce
 
 jobs:
@@ -14,7 +19,7 @@ jobs:
       - name: delete test-release for closed pr
         run: |
           echo ${{ github.token }} | gh auth login --with-token
-          
+
           gh release delete ${{ env.version }} -y --repo ${{ github.repository }} || exit 0
       - run: mkdir -p /home/runner/.ssh
       - name: delete cdn77 test upload
