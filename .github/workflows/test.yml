@@ -4,7 +4,6 @@ on:
 
 env:
   ##### EDIT ME #####
-  codename: Ornara
   iso-profiles-git: https://gitlab.manjaro.org/profiles-and-settings/iso-profiles
   version: test-release-${{ github.event.number }}
   ###################
@@ -18,7 +17,6 @@ jobs:
         EDITION: [xfce]
         BRANCH: [stable]
         SCOPE: [full, minimal]
-        KERNEL: [linux510]
         ###################
     steps:
       - uses: styfle/cancel-workflow-action@0.9.0
@@ -44,7 +42,7 @@ jobs:
             ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-${{ matrix.kernel }}-
             ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-
             ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-
-      - id: copy-cache-to-target
+      - name: copy-cache-to-pkg
         if: ${{ steps.cache.outputs.cache-hit == 'true' }}
         run: |
           sudo mkdir -p /var/cache/pacman/pkg
@@ -59,8 +57,6 @@ jobs:
           branch: ${{ matrix.branch }}
           scope: ${{ matrix.scope }}
           version: ${{ env.version }}
-          kernel: ${{ matrix.kernel }}
-          code-name: ${{ env.codename }}
           release-tag: ${{ env.version }}
           gpg-secret-key-base64: ${{ secrets.GPG_SECRET_KEY_BASE64 }}
           gpg-passphrase: 1234
@@ -70,7 +66,10 @@ jobs:
           sf-project: manjarolinux
           sf-user: ${{ secrets.SF_USER_NAME }}
           sf-key: ${{ secrets.SF_PRIV_SSHKEY }}
-      - id: copy-cache-target-to-cache
+          osdn-project: manjaro
+          osdn-user: ${{ secrets.OSDN_USER_NAME }}
+          osdn-key: ${{ secrets.OSDN_PRIV_SSHKEY }}
+      - name: copy-pkgs-to-cache
         run: |
           mkdir -p package-cache
           sudo cp --verbose --force --recursive /var/cache/pacman/pkg/* ./package-cache

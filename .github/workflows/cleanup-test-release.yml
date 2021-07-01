@@ -14,9 +14,28 @@ jobs:
       - name: delete test-release for closed pr
         run: |
           echo ${{ github.token }} | gh auth login --with-token
+          
           gh release delete ${{ env.version }} -y --repo ${{ github.repository }} || exit 0
+      - run: mkdir -p /home/runner/.ssh
       - name: delete cdn77 test upload
         run: |
-          mkdir -p /home/runner/.ssh
           ssh-keyscan -t rsa ${{ secrets.CDN_HOST }} >> /home/runner/.ssh/known_hosts
-          sshpass -p "${{ secrets.CDN_PWD }}" rsync --delete -vaP --stats -e ssh $(mktemp) ${{ secrets.CDN_USER }}@${{ secrets.CDN_HOST }}:/www/${{ env.edition }}/${{ env.version }}
+          
+          sshpass -p "${{ secrets.CDN_PWD }}" rsync --delete -vaP --stats \
+            -e ssh $(mktemp) ${{ secrets.CDN_USER }}@${{ secrets.CDN_HOST }}:/www/${{ env.edition }}/${{ env.version }}
+      - name: delete sourceforge test upload
+        run: |
+          ssh-keyscan -t rsa frs.sourceforge.net >> /home/runner/.ssh/known_hosts
+          echo "${{ secrets.SF_PRIV_SSHKEY }}" >> /home/runner/.ssh/github_actions
+          ssh-add /home/runner/.ssh/github_actions
+
+          rsync --delete -vaP --stats \
+            -e ssh $(mktemp) ${{ secrets.SF_USER_NAME }}@frs.sourceforge.net:/home/frs/project/manjarolinux/
+      - name: delete osdn test upload
+        run: |
+          ssh-keyscan -t rsa storage.osdn.net >> /home/runner/.ssh/known_hosts
+          echo "${{ secrets.OSDN_PRIV_SSHKEY }}" >> /home/runner/.ssh/github_actions
+          ssh-add /home/runner/.ssh/github_actions
+
+          rsync --delete -vaP --stats \
+            -e ssh $(mktemp) ${{ secrets.OSDN_USER_NAME }}@storage.osdn.net:/storage/groups/m/ma/manjaro/${{ env.edition }}/${{ env.version }}

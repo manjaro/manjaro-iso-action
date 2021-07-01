@@ -59,6 +59,15 @@ inputs:
   sf-key:
     description: 'sf upload credentials'
     required: false
+  osdn-project:
+    description: 'osdn upload credentials'
+    required: false
+  osdn-user:
+    description: 'osdn upload credentials'
+    required: false
+  osdn-key:
+    description: 'osdn upload credentials'
+    required: false
 
 outputs:
   file-path:
@@ -232,19 +241,21 @@ runs:
         echo "## gpg signing"
         cat <(echo -e "${{ inputs.gpg-secret-key-base64 }}" | base64 --decode) | gpg --batch --import
         gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg-passphrase }}" --detach-sign ./${{ steps.image-build.outputs.file-path }}
-    - id: ssh_prepare
-      shell: bash
+    - id: upload-prepare
+      shell: bash -O extglob {0}
       run: |
         echo "## ssh setup"
         mkdir -p /home/runner/.ssh
         touch /home/runner/.ssh/github_actions
         chmod 600 /home/runner/.ssh/github_actions
         ssh-agent -a /tmp/ssh_agent.sock > /dev/null
-    - id: upload-cdn77
+        echo "::set-output name=upload-files::./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig|.torrent)"
+        mkdir -p ${{ inputs.edition }}/${{ inputs.version }}
+    - name: upload-cdn77
       shell: bash -O extglob {0}
       run: |
         # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
-        if [ -z ${{ inputs.cdn77-host }} ] || [ -z ${{ inputs.cdn77-user }} ] || [ -z ${{ inputs.cdn77-pwd }} ]; then 
+        if [ -z "${{ inputs.cdn77-host }}" ] || [ -z "${{ inputs.cdn77-user }}" ] || [ -z "${{ inputs.cdn77-pwd }}" ]; then 
           echo "## not (all) credentials given for cdn77 upload"
           exit 0
         fi
@@ -255,14 +266,22 @@ runs:
           -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}
         
         ssh-keyscan -t rsa ${{ inputs.cdn77-host }} >> /home/runner/.ssh/known_hosts
-        sshpass -p "${{ inputs.cdn77-pwd }}" rsync -rvvaP \
-          --stats -e ssh ./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig|.torrent) \
-          ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/${{ inputs.editon }}/${{ inputs.version }}/
-    - id: upload-sourceforge
+
+        ## create target dir
+        sshpass -p "${{ inputs.cdn77-pwd }}" rsync -vaP --stats -e ssh ${{ inputs.edition }} \
+          ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/
+
+        # upload
+        sshpass -p "${{ inputs.cdn77-pwd }}" rsync -vaP \
+          --stats -e ssh ${{ steps.upload-prepare.outputs.upload-files }} \
+          ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/${{ inputs.edition }}/${{ inputs.version }}/
+    - name: upload-sourceforge
       shell: bash -O extglob {0}
+      env:
+        SSH_AUTH_SOCK: /tmp/ssh_agent.sock
       run: |
         # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
-        if [ -z ${{ inputs.sf-project }} ] || [ -z ${{ inputs.sf-user }} ] || [ -z ${{ inputs.sf-key }} ]; then 
+        if [ -z "${{ inputs.sf-project }}" ] || [ -z "${{ inputs.sf-user }}" ] || [ -z "${{ inputs.sf-key }}" ]; then 
           echo "## not (all) credentials given for sourceforge upload"
           exit 0
         fi
@@ -272,9 +291,35 @@ runs:
         echo "${{ inputs.sf-key }}" >> /home/runner/.ssh/github_actions
         ssh-add /home/runner/.ssh/github_actions
 
-        rsync -rvvaP \
-          --stats -e ssh ./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig|.torrent) \
+        ## create target dir
+        rsync -vaP --stats -e ssh ${{ inputs.edition }} \
           ${{ inputs.sf-user }}@frs.sourceforge.net:/home/frs/project/${{ inputs.sf-project }}/
+
+        ## upload
+        rsync -vaP --stats -e ssh ${{ steps.upload-prepare.outputs.upload-files }} \
+          ${{ inputs.sf-user }}@frs.sourceforge.net:/home/frs/project/${{ inputs.sf-project }}/
+    - name: upload-osdn
+      shell: bash -O extglob {0}
+      env:
+        SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+      run: |
+        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
+        if [ -z "${{ inputs.osdn-project }}" ] || [ -z "${{ inputs.osdn-user }}" ] || [ -z "${{ inputs.osdn-key }}" ]; then 
+          echo "## not (all) credentials given for osdn upload"
+          exit 0
+        fi
+        echo "## osdn upload"
+
+        ssh-keyscan -t rsa storage.osdn.net >> /home/runner/.ssh/known_hosts
+        echo "${{ inputs.osdn-key }}" >> /home/runner/.ssh/github_actions
+        ssh-add /home/runner/.ssh/github_actions
+
+        ## create target dir
+        rsync -vaP --stats -e ssh ${{ inputs.edition }} \
+          ${{ inputs.osdn-user }}@storage.osdn.net:/storage/groups/m/ma/${{ inputs.osdn-project }}/
+
+        rsync -vaP --stats -e ssh ${{ steps.upload-prepare.outputs.upload-files }} \
+          ${{ inputs.osdn-user }}@storage.osdn.net:/storage/groups/m/ma/${{ inputs.osdn-project }}/
     - id: upload-github-release
       shell: bash -O extglob {0}
       run: |
@@ -291,12 +336,10 @@ runs:
         if [[ -z "$(du --threshold=1950M ${{ steps.image-build.outputs.file-path }})" ]]; then
           # iso is small enough to upload already
           gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
-            ./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig|.torrent)
+            ${{ steps.upload-prepare.outputs.upload-files }}
         else
           # iso is too big - creating a split-zip
           zip -j -s 1950m ${{ steps.image-build.outputs.file-path }}.zip ${{ steps.image-build.outputs.file-path }}
           gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
             ./${{ steps.image-build.outputs.file-path }}+(.z*|.sha*|.pkgs|.sig|.torrent)
         fi
-
-
