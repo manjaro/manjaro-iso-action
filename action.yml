@@ -6,6 +6,9 @@ inputs:
     description: 'iso profiles to clone'
     required: false
     default: 'https://gitlab.manjaro.org/profiles-and-settings/iso-profiles'
+  iso-profiles-branch:
+    description: 'branch of the iso profiles to check out'
+    required: false
   edition:
     description: 'name of the iso profile to build'
     required: true
@@ -179,8 +182,8 @@ runs:
       shell: bash
       env:
         REPO: ${{ inputs.iso-profiles-repo }}
-      run: |
-        sudo git clone --depth 1 ${REPO} iso-profiles
+        BRANCH: ${{ inputs.iso-profiles-branch }}
+      run: sudo git clone ${BRANCH:+--branch ${BRANCH}} --depth 1 ${REPO} iso-profiles
     - id: image-build
       shell: bash
       env:
@@ -230,7 +233,7 @@ runs:
         cat <(echo -e "${{ inputs.gpg-secret-key-base64 }}" | base64 --decode) | gpg --batch --import
         gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg-passphrase }}" --detach-sign ./${{ steps.image-build.outputs.file-path }}
     - id: ssh_prepare
-      shell: bash -O extglob {0}
+      shell: bash
       run: |
         echo "## ssh setup"
         mkdir -p /home/runner/.ssh
@@ -238,7 +241,7 @@ runs:
         chmod 600 /home/runner/.ssh/github_actions
         ssh-agent -a /tmp/ssh_agent.sock > /dev/null
     - id: upload-cdn77
-      shell: bash
+      shell: bash -O extglob {0}
       run: |
         # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
         if [ -z ${{ inputs.cdn77-host }} ] || [ -z ${{ inputs.cdn77-user }} ] || [ -z ${{ inputs.cdn77-pwd }} ]; then 
