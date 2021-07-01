@@ -42,7 +42,7 @@ jobs:
           ssh-add /home/runner/.ssh/github_actions
 
           rsync --delete -vaP --stats \
-            -e ssh $(mktemp) ${{ secrets.SF_USER_NAME }}@frs.sourceforge.net:/home/frs/project/manjarolinux/
+            -e ssh $(mktemp) ${{ secrets.SF_USER_NAME }}@frs.sourceforge.net:/home/frs/project/manjarolinux/${{ env.edition }}/${{ env.version }}
       - name: delete osdn test upload
         run: |
           ssh-keyscan -t rsa storage.osdn.net >> /home/runner/.ssh/known_hosts
