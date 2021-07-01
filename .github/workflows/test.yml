@@ -16,7 +16,7 @@ jobs:
         ##### EDIT ME #####
         EDITION: [xfce]
         BRANCH: [stable]
-        SCOPE: [full, minimal]
+        SCOPE: [minimal]
         ###################
     steps:
       - uses: styfle/cancel-workflow-action@0.9.0
@@ -28,6 +28,7 @@ jobs:
           echo ${{ github.token }} | gh auth login --with-token
           gh release delete ${{ env.version }} -y --repo ${{ github.repository }} || exit 0
       - id: cache-key
+        # this basically busts the cache every week
         run: echo "::set-output name=key::package-cache-$(/bin/date -u "+%Y%U")"
         shell: bash
       - id: cache
@@ -45,7 +46,7 @@ jobs:
       - name: copy-cache-to-pkg
         if: ${{ steps.cache.outputs.cache-hit == 'true' }}
         run: |
-          sudo mkdir -p /var/cache/pacman/pkg
+          sudo mkdir -p /var/cache/pacman/pkg 
           sudo cp -fr ./package-cache/* /var/cache/pacman/pkg/
           sudo mkdir -p /var/cache/apt
           sudo cp -fr ./apt-cache/* /var/cache/apt/
@@ -71,6 +72,6 @@ jobs:
           osdn-key: ${{ secrets.OSDN_PRIV_SSHKEY }}
       - name: copy-pkgs-to-cache
         run: |
-          mkdir -p package-cache
+          mkdir -p package-cache apt-cache
           sudo cp --verbose --force --recursive /var/cache/pacman/pkg/* ./package-cache
           sudo cp --verbose --force --recursive /var/cache/apt/* ./apt-cache
