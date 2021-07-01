@@ -297,7 +297,7 @@ runs:
 
         ## upload
         rsync -vaP --stats -e ssh ${{ steps.upload-prepare.outputs.upload-files }} \
-          ${{ inputs.sf-user }}@frs.sourceforge.net:/home/frs/project/${{ inputs.sf-project }}/
+          ${{ inputs.sf-user }}@frs.sourceforge.net:/home/frs/project/${{ inputs.sf-project }}/${{ inputs.edition }}/${{ inputs.version }}/
     - name: upload-osdn
       shell: bash -O extglob {0}
       env:
@@ -319,7 +319,7 @@ runs:
           ${{ inputs.osdn-user }}@storage.osdn.net:/storage/groups/m/ma/${{ inputs.osdn-project }}/
 
         rsync -vaP --stats -e ssh ${{ steps.upload-prepare.outputs.upload-files }} \
-          ${{ inputs.osdn-user }}@storage.osdn.net:/storage/groups/m/ma/${{ inputs.osdn-project }}/
+          ${{ inputs.osdn-user }}@storage.osdn.net:/storage/groups/m/ma/${{ inputs.osdn-project }}/${{ inputs.edition }}/${{ inputs.version }}/
     - id: upload-github-release
       shell: bash -O extglob {0}
       run: |
