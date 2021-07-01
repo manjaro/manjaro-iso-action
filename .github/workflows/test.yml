@@ -27,6 +27,7 @@ jobs:
         run: |
           echo ${{ github.token }} | gh auth login --with-token
           gh release delete ${{ env.version }} -y --repo ${{ github.repository }} || exit 0
+          git push --delete origin ${{ env.version }}
       - id: cache-key
         # this basically busts the cache every week
         run: echo "::set-output name=key::package-cache-$(/bin/date -u "+%Y%U")"
@@ -35,7 +36,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: |
-            package-cache
+            package-cacheo
             apt-cache
           key: ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-${{ matrix.kernel }}-${{ matrix.scope }}
           restore-keys:  |
