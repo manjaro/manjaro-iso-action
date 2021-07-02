@@ -36,6 +36,8 @@ jobs:
           sshpass -p "${{ secrets.CDN_PWD }}" rsync --delete -vaP --stats \
             -e ssh $(mktemp) ${{ secrets.CDN_USER }}@${{ secrets.CDN_HOST }}:/www/${{ env.edition }}/${{ env.version }}
       - name: delete sourceforge test upload
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
         run: |
           ssh-keyscan -t rsa frs.sourceforge.net >> /home/runner/.ssh/known_hosts
           echo "${{ secrets.SF_PRIV_SSHKEY }}" >> /home/runner/.ssh/github_actions
@@ -44,6 +46,8 @@ jobs:
           rsync --delete -vaP --stats \
             -e ssh $(mktemp) ${{ secrets.SF_USER_NAME }}@frs.sourceforge.net:/home/frs/project/manjarolinux/${{ env.edition }}/${{ env.version }}
       - name: delete osdn test upload
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
         run: |
           ssh-keyscan -t rsa storage.osdn.net >> /home/runner/.ssh/known_hosts
           echo "${{ secrets.OSDN_PRIV_SSHKEY }}" >> /home/runner/.ssh/github_actions
