@@ -96,6 +96,10 @@ jobs:
     gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
 ```
 
+### caching
+
+to get an idea how caching might work, please refer [here](.github/workflows/test.yml)
+
 ## Distribution channels
 
 all distribution channels can be configured by setting / leaving out of their configuration variables.

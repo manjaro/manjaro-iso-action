@@ -30,27 +30,16 @@ jobs:
           git push --delete origin ${{ env.version }}
       - id: cache-key
         # this basically busts the cache every week
-        run: echo "::set-output name=key::package-cache-$(/bin/date -u "+%Y%U")"
+        run: echo "::set-output name=key::system-cache-$(/bin/date -u "+%Y%U")"
         shell: bash
       - id: cache
         uses: actions/cache@v2
         with:
-          path: |
-            package-cacheo
-            apt-cache
-          key: ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-${{ matrix.kernel }}-${{ matrix.scope }}
+          path: ${{ runner.temp }}/system-cache
+          key: ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-${{ matrix.scope }}
           restore-keys:  |
-            ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-${{ matrix.kernel }}-${{ matrix.scope }}
-            ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-${{ matrix.kernel }}-
             ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-
             ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-
-      - name: copy-cache-to-pkg
-        if: ${{ steps.cache.outputs.cache-hit == 'true' }}
-        run: |
-          sudo mkdir -p /var/cache/pacman/pkg 
-          sudo cp -fr ./package-cache/* /var/cache/pacman/pkg/
-          sudo mkdir -p /var/cache/apt
-          sudo cp -fr ./apt-cache/* /var/cache/apt/
       - id: image-build
         uses: ./
         with:
@@ -71,8 +60,3 @@ jobs:
           osdn-project: manjaro
           osdn-user: ${{ secrets.OSDN_USER_NAME }}
           osdn-key: ${{ secrets.OSDN_PRIV_SSHKEY }}
-      - name: copy-pkgs-to-cache
-        run: |
-          mkdir -p package-cache apt-cache
-          sudo cp --verbose --force --recursive /var/cache/pacman/pkg/* ./package-cache
-          sudo cp --verbose --force --recursive /var/cache/apt/* ./apt-cache

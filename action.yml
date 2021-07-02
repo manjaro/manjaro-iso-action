@@ -77,11 +77,14 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: copy-cache-to-pkg
+      shell: bash
+      run: mkdir ${{ runner.temp }}/system-cache/ && rsync -r ${{ runner.temp }}/system-cache/ /var/cache/
     - id: install-build-dependencies
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt install \
+        sudo apt-get install \
           gdisk \
           zip \
           systemd-container \
@@ -343,3 +346,12 @@ runs:
           gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
             ./${{ steps.image-build.outputs.file-path }}+(.z*|.sha*|.pkgs|.sig|.torrent)
         fi
+    - name: copy-pkgs-to-cache
+      shell: bash
+      run: |
+        rsync -r \
+          --delete \
+          --exclude="*" \
+          --include="apt/*" --exclude="apt/archives/*"
+          --include="pacman/*" \
+          /var/cache/ ${{ runner.temp }}/cache/
