@@ -79,7 +79,7 @@ runs:
   steps:
     - name: copy-cache-to-pkg
       shell: bash
-      run: mkdir ${{ runner.temp }}/system-cache/ && rsync -r ${{ runner.temp }}/system-cache/ /var/cache/
+      run: mkdir -p ${{ runner.temp }}/system-cache/ && rsync -r --stats ${{ runner.temp }}/system-cache/ /var/cache/
     - id: install-build-dependencies
       shell: bash
       run: |
@@ -349,9 +349,9 @@ runs:
     - name: copy-pkgs-to-cache
       shell: bash
       run: |
-        rsync -r \
+        rsync -r --stats \
           --delete \
           --exclude="*" \
-          --include="apt/*" --exclude="apt/archives/*"
+          --include="apt/*" --exclude="apt/archives/*" \
           --include="pacman/*" \
           /var/cache/ ${{ runner.temp }}/cache/

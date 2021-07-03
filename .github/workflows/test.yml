@@ -9,8 +9,18 @@ env:
   ###################
 
 jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: delete test-release
+        run: |
+          echo ${{ github.token }} | gh auth login --with-token
+          gh release delete ${{ env.version }} -y --repo ${{ github.repository }} || exit 0
+          git push --delete origin ${{ env.version }}
   build-release:
     runs-on: ubuntu-20.04
+    needs: [cleanup]
     strategy:
       matrix:
         ##### EDIT ME #####
@@ -23,11 +33,6 @@ jobs:
         with:
           access_token: ${{ github.token }}
       - uses: actions/checkout@v2
-      - name: delete test-release
-        run: |
-          echo ${{ github.token }} | gh auth login --with-token
-          gh release delete ${{ env.version }} -y --repo ${{ github.repository }} || exit 0
-          git push --delete origin ${{ env.version }}
       - id: cache-key
         # this basically busts the cache every week
         run: echo "::set-output name=key::system-cache-$(/bin/date -u "+%Y%U")"
