@@ -57,6 +57,7 @@ jobs:
           sf-project: manjarolinux
           sf-user: ${{ secrets.SF_USER_NAME }}
           sf-key: ${{ secrets.SF_PRIV_SSHKEY }}
-          osdn-project: manjaro
-          osdn-user: ${{ secrets.OSDN_USER_NAME }}
-          osdn-key: ${{ secrets.OSDN_PRIV_SSHKEY }}
+          # osdn is absurdly slow sometimes
+          # osdn-project: manjaro
+          # osdn-user: ${{ secrets.OSDN_USER_NAME }}
+          # osdn-key: ${{ secrets.OSDN_PRIV_SSHKEY }}
