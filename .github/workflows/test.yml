@@ -2,25 +2,67 @@ name: 'build-test'
 on:
   pull_request:
 
+env:
+  ##### EDIT ME #####
+  iso-profiles-git: https://gitlab.manjaro.org/profiles-and-settings/iso-profiles
+  version: test-release-${{ github.event.number }}
+  ###################
+
 jobs:
-  test:
+  cleanup:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - name: delete test-release
         run: |
           echo ${{ github.token }} | gh auth login --with-token
-          gh release delete test-release-${{github.event.number}} -y --repo ${{ github.repository }} || exit 0
+          gh release delete ${{ env.version }} -y --repo ${{ github.repository }} || exit 0
+          git push --delete origin ${{ env.version }}
+  build-release:
+    runs-on: ubuntu-20.04
+    needs: [cleanup]
+    strategy:
+      matrix:
+        ##### EDIT ME #####
+        EDITION: [xfce]
+        BRANCH: [stable]
+        SCOPE: [minimal]
+        ###################
+    steps:
+      - uses: styfle/cancel-workflow-action@0.9.0
+        with:
+          access_token: ${{ github.token }}
+      - uses: actions/checkout@v2
+      - id: cache-key
+        # this basically busts the cache every week
+        run: echo "::set-output name=key::system-cache-$(/bin/date -u "+%Y%U")"
+        shell: bash
+      - id: cache
+        uses: actions/cache@v2
+        with:
+          path: ${{ runner.temp }}/system-cache
+          key: ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-${{ matrix.scope }}
+          restore-keys:  |
+            ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-${{ matrix.branch }}-
+            ${{ steps.cache-key.outputs.key }}-${{ matrix.edition }}-
       - id: image-build
         uses: ./
         with:
-          iso-profiles-repo: https://gitlab.manjaro.org/profiles-and-settings/iso-profiles
-          edition: xfce
-          branch: stable
-          scope: minimal
-          version: "21.0"
-          kernel: linux510
-          code-name: Ornara
-          release-tag: test-release-${{github.event.number}}
+          iso-profiles-repo: ${{ env.iso-profiles-git }}
+          edition: ${{ matrix.edition }}
+          branch: ${{ matrix.branch }}
+          scope: ${{ matrix.scope }}
+          version: ${{ env.version }}
+          release-tag: ${{ env.version }}
           gpg-secret-key-base64: ${{ secrets.GPG_SECRET_KEY_BASE64 }}
           gpg-passphrase: 1234
+          cdn77-host: ${{ secrets.CDN_HOST }}
+          cdn77-user: ${{ secrets.CDN_USER }}
+          cdn77-pwd: ${{ secrets.CDN_PWD }}
+          sf-project: manjarolinux
+          sf-user: ${{ secrets.SF_USER_NAME }}
+          sf-key: ${{ secrets.SF_PRIV_SSHKEY }}
+          # osdn is absurdly slow sometimes
+          # osdn-project: manjaro
+          # osdn-user: ${{ secrets.OSDN_USER_NAME }}
+          # osdn-key: ${{ secrets.OSDN_PRIV_SSHKEY }}

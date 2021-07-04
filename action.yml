@@ -6,6 +6,9 @@ inputs:
     description: 'iso profiles to clone'
     required: false
     default: 'https://gitlab.manjaro.org/profiles-and-settings/iso-profiles'
+  iso-profiles-branch:
+    description: 'branch of the iso profiles to check out'
+    required: false
   edition:
     description: 'name of the iso profile to build'
     required: true
@@ -38,27 +41,50 @@ inputs:
   gpg-passphrase:
     description: 'phrase to decrypt the gpg secret key if given'
     required: false
+  cdn77-host:
+    description: 'cdn77 upload credentials'
+    required: false
+  cdn77-user:
+    description: 'cdn77 upload credentials'
+    required: false
+  cdn77-pwd:
+    description: 'cdn77 upload credentials'
+    required: false
+  sf-project:
+    description: 'sf upload credentials'
+    required: false
+  sf-user:
+    description: 'sf upload credentials'
+    required: false
+  sf-key:
+    description: 'sf upload credentials'
+    required: false
+  osdn-project:
+    description: 'osdn upload credentials'
+    required: false
+  osdn-user:
+    description: 'osdn upload credentials'
+    required: false
+  osdn-key:
+    description: 'osdn upload credentials'
+    required: false
 
 outputs:
-  file-pkg:
-    description: "compressed files"
-    value: ${{ steps.image-build.outputs.file-pkg }}
   file-path:
     description: "path of the generated iso"
     value: ${{ steps.image-build.outputs.file-path }}
-  file-sha256:
-    description: "checksum file for the iso"
-    value: ${{ steps.image-build.outputs.file-sha256 }}
 
 runs:
   using: "composite"
   steps:
-    - 
-      name: install-build-dependencies
+    - name: copy-cache-to-pkg
+      shell: bash
+      run: mkdir -p ${{ runner.temp }}/system-cache/ && rsync -r --stats ${{ runner.temp }}/system-cache/ /var/cache/
+    - id: install-build-dependencies
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt install \
+        sudo apt-get install \
           gdisk \
           zip \
           systemd-container \
@@ -81,9 +107,9 @@ runs:
           dosfstools \
           libisoburn1 \
           squashfs-tools \
-          docbook2x
-    -
-      name: install-pacman
+          docbook2x \
+          mktorrent
+    - id: install-pacman
       shell: bash
       env:
         PACMAN_VERSION: 5.2.2
@@ -106,8 +132,7 @@ runs:
         sudo mkdir -p /etc/pacman.d
         sudo touch /etc/pacman.d/mirrorlist
         popd
-    -
-      name: install-keyrings
+    - id: install-keyrings
       shell: bash
       run: |
         sudo git clone --depth 1 https://gitlab.manjaro.org/packages/core/manjaro-keyring.git
@@ -127,8 +152,7 @@ runs:
 
         sudo pacman-key --init
         sudo pacman-key --populate archlinux manjaro
-    -
-      name: install-arch-install-scripts
+    - id: install-arch-install-scripts
       shell: bash
       env:
         VERSION: 24
@@ -140,8 +164,7 @@ runs:
         sudo make -C arch-install-scripts-${VERSION} PREFIX=/usr install
         
         sudo wget https://gitlab.manjaro.org/applications/pacman-mirrors/-/raw/v4.19x-stable/conf/pacman-mirrors.conf -O /etc/pacman-mirrors.conf
-    -
-      name: install-calamares-tools
+    - id: install-calamares-tools
       shell: bash
       run: |
         sudo git clone --depth 1 https://gitlab.manjaro.org/applications/calamares-tools.git
@@ -149,8 +172,7 @@ runs:
         cd calamares-tools
         sudo install -d /usr/share/calamares/
         sudo cp -rv schemas/ /usr/share/calamares/
-    -
-      name: install-mkinitcpio
+    - id: install-mkinitcpio
       shell: bash
       env:
         VERSION: 30
@@ -159,8 +181,7 @@ runs:
         sudo tar -xf mkinitcpio-v${VERSION}.tar.gz
         sudo make -C mkinitcpio-v${VERSION} install
         sudo sed -i -e 's|File|Path|' /usr/share/libalpm/hooks/*hook
-    -
-      name: install-manjaro-tools
+    - id: install-manjaro-tools
       shell: bash
       run: |
         sudo git clone --depth 1 https://gitlab.manjaro.org/tools/development-tools/manjaro-tools.git
@@ -169,15 +190,13 @@ runs:
         sudo make SYSCONFDIR=/etc PREFIX=/usr install_base
         sudo make SYSCONFDIR=/etc PREFIX=/usr install_yaml
         sudo make SYSCONFDIR=/etc PREFIX=/usr install_iso
-    -
-      name: checkout-iso-profiles
+    - id: checkout-iso-profiles
       shell: bash
       env:
         REPO: ${{ inputs.iso-profiles-repo }}
-      run: |
-        sudo git clone --depth 1 ${REPO} iso-profiles
-    -
-      id: image-build
+        BRANCH: ${{ inputs.iso-profiles-branch }}
+      run: sudo git clone ${BRANCH:+--branch ${BRANCH}} --depth 1 ${REPO} iso-profiles
+    - id: image-build
       shell: bash
       env:
         EDITION: ${{ inputs.edition }}
@@ -187,6 +206,7 @@ runs:
         KERNEL: ${{ inputs.kernel }}
         CODE_NAME: ${{ inputs.code-name }}
       run: |
+        echo "## building iso"
         [ "$SCOPE" == "minimal" ] && unset SCOPE
 
         sudo sed -i -e 's|dist_name=$(get_distname)|dist_name=Manjaro|g' /usr/lib/manjaro-tools/util.sh
@@ -195,50 +215,143 @@ runs:
         sudo sed -i -e "s|dist_release=\$(get_release)|dist_release=$VERSION|g" /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e "s|dist_codename=\$(get_codename)|dist_codename=\"$CODE_NAME\"|g" /usr/lib/manjaro-tools/util.sh
         
-        #sudo buildiso ${SCOPE:+-f} -p $EDITION -b $BRANCH -k $KERNEL -qv   
         sudo buildiso ${SCOPE:+-f} -p $EDITION -b $BRANCH -k $KERNEL
         
         sudo rm -Rf /var/lib/manjaro-tools/buildiso/*
         
-        FILE_PATH=$(find /var/cache/manjaro-tools/iso -type f -name "*.iso" -exec stat -c '%Y %n' {} \; | sort -nr | awk 'NR==1 {print $2}')
-        echo "::set-output name=file-path::$(basename $FILE_PATH)"
-
-        zip -j -s 1950m $(basename $FILE_PATH).zip $FILE_PATH
-        ls -lasih .
-        sha256sum $(basename $FILE_PATH).z* > $(basename $FILE_PATH).sha256
+        OUTPUT_ISO_PATH=$(find /var/cache/manjaro-tools/iso -type f -name "*.iso" -exec stat -c '%Y %n' {} \; | sort -nr | awk 'NR==1 {print $2}')
+        TARGET_ISO_PATH=$(basename $OUTPUT_ISO_PATH)
+        mv $OUTPUT_ISO_PATH ./$TARGET_ISO_PATH
+        echo "::set-output name=file-path::$TARGET_ISO_PATH"
 
         FILE_PKG=$(find /var/cache/manjaro-tools/iso -type f -name "*-pkgs.txt" -exec stat -c '%Y %n' {} \; | sort -nr | awk 'NR==1 {print $2}')
-        cp -v $FILE_PKG .
-        echo "::set-output name=file-pkg::$(basename $FILE_PKG)"
-    -
-      id: gpg_sign
+        mv $FILE_PKG ./${TARGET_ISO_PATH}.pkgs
+    - id: hash
       shell: bash
       run: |
-        if [ -z ${{ inputs.gpg-secret-key-base64 }} ]; then 
-          echo "no gpg secret given"
+        echo "## calculating hashes"
+        sha1sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha1
+        sha256sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha256
+        sha512sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha512
+    - id: gpg_sign
+      shell: bash
+      run: |
+        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
+        if [ -z "${{ inputs.gpg-secret-key-base64 }}" ]; then 
+          echo "## no gpg secret given"
           exit 0
         fi
-
+        echo "## gpg signing"
         cat <(echo -e "${{ inputs.gpg-secret-key-base64 }}" | base64 --decode) | gpg --batch --import
-        shopt -s extglob
-        for file in ./${{ steps.image-build.outputs.file-path }}.z*; do
-          gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg-passphrase }}" --detach-sign $file
-        done
-    - 
-      id: upload-release
-      shell: bash
+        gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg-passphrase }}" --detach-sign ./${{ steps.image-build.outputs.file-path }}
+    - id: upload-prepare
+      shell: bash -O extglob {0}
       run: |
-        if [ -z ${{ inputs.release-tag }} ]; then 
-          echo "no release tag given"
+        echo "## ssh setup"
+        mkdir -p /home/runner/.ssh
+        touch /home/runner/.ssh/github_actions
+        chmod 600 /home/runner/.ssh/github_actions
+        ssh-agent -a /tmp/ssh_agent.sock > /dev/null
+        echo "::set-output name=upload-files::./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig|.torrent)"
+        mkdir -p ${{ inputs.edition }}/${{ inputs.version }}
+    - name: upload-cdn77
+      shell: bash -O extglob {0}
+      run: |
+        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
+        if [ -z "${{ inputs.cdn77-host }}" ] || [ -z "${{ inputs.cdn77-user }}" ] || [ -z "${{ inputs.cdn77-pwd }}" ]; then 
+          echo "## not (all) credentials given for cdn77 upload"
           exit 0
         fi
+        echo "## cdn77 upload"
+        
+        mktorrent -v -a udp://tracker.opentrackr.org:1337 -l 21 \
+          -w "https://download.manjaro.org/${{ inputs.edition }}/${{ inputs.version }}/${{ steps.image-build.outputs.file-path }}" \
+          -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}
+        
+        ssh-keyscan -t rsa ${{ inputs.cdn77-host }} >> /home/runner/.ssh/known_hosts
+
+        ## create target dir
+        sshpass -p "${{ inputs.cdn77-pwd }}" rsync -vaP --stats -e ssh ${{ inputs.edition }} \
+          ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/
+
+        # upload
+        sshpass -p "${{ inputs.cdn77-pwd }}" rsync -vaP \
+          --stats -e ssh ${{ steps.upload-prepare.outputs.upload-files }} \
+          ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/${{ inputs.edition }}/${{ inputs.version }}/
+    - name: upload-sourceforge
+      shell: bash -O extglob {0}
+      env:
+        SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+      run: |
+        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
+        if [ -z "${{ inputs.sf-project }}" ] || [ -z "${{ inputs.sf-user }}" ] || [ -z "${{ inputs.sf-key }}" ]; then 
+          echo "## not (all) credentials given for sourceforge upload"
+          exit 0
+        fi
+        echo "## sourceforge upload"
+        
+        ssh-keyscan -t rsa frs.sourceforge.net >> /home/runner/.ssh/known_hosts
+        echo "${{ inputs.sf-key }}" >> /home/runner/.ssh/github_actions
+        ssh-add /home/runner/.ssh/github_actions
+
+        ## create target dir
+        rsync -vaP --stats -e ssh ${{ inputs.edition }} \
+          ${{ inputs.sf-user }}@frs.sourceforge.net:/home/frs/project/${{ inputs.sf-project }}/
+
+        ## upload
+        rsync -vaP --stats -e ssh ${{ steps.upload-prepare.outputs.upload-files }} \
+          ${{ inputs.sf-user }}@frs.sourceforge.net:/home/frs/project/${{ inputs.sf-project }}/${{ inputs.edition }}/${{ inputs.version }}/
+    - name: upload-osdn
+      shell: bash -O extglob {0}
+      env:
+        SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+      run: |
+        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
+        if [ -z "${{ inputs.osdn-project }}" ] || [ -z "${{ inputs.osdn-user }}" ] || [ -z "${{ inputs.osdn-key }}" ]; then 
+          echo "## not (all) credentials given for osdn upload"
+          exit 0
+        fi
+        echo "## osdn upload"
+
+        ssh-keyscan -t rsa storage.osdn.net >> /home/runner/.ssh/known_hosts
+        echo "${{ inputs.osdn-key }}" >> /home/runner/.ssh/github_actions
+        ssh-add /home/runner/.ssh/github_actions
+
+        ## create target dir
+        rsync -vaP --stats -e ssh ${{ inputs.edition }} \
+          ${{ inputs.osdn-user }}@storage.osdn.net:/storage/groups/m/ma/${{ inputs.osdn-project }}/
+
+        rsync -vaP --stats -e ssh ${{ steps.upload-prepare.outputs.upload-files }} \
+          ${{ inputs.osdn-user }}@storage.osdn.net:/storage/groups/m/ma/${{ inputs.osdn-project }}/${{ inputs.edition }}/${{ inputs.version }}/
+    - id: upload-github-release
+      shell: bash -O extglob {0}
+      run: |
+        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
+        if [ -z "${{ inputs.release-tag }}" ]; then 
+          echo "## no release tag given"
+          exit 0
+        fi
+        echo "## github upload"
 
         echo ${{ github.token }} | gh auth login --with-token
         gh release create ${{ inputs.release-tag }} --repo ${{ github.repository }} --notes "automated release" || echo "release already exists"
-        shopt -s extglob
-        gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
-          ./${{ steps.image-build.outputs.file-path }}.+(z*|sha*) \
-          ./${{ steps.image-build.outputs.file-pkg }}
 
-
-
+        if [[ -z "$(du --threshold=1950M ${{ steps.image-build.outputs.file-path }})" ]]; then
+          # iso is small enough to upload already
+          gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
+            ${{ steps.upload-prepare.outputs.upload-files }}
+        else
+          # iso is too big - creating a split-zip
+          zip -j -s 1950m ${{ steps.image-build.outputs.file-path }}.zip ${{ steps.image-build.outputs.file-path }}
+          gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
+            ./${{ steps.image-build.outputs.file-path }}+(.z*|.sha*|.pkgs|.sig|.torrent)
+        fi
+    - name: copy-pkgs-to-cache
+      shell: bash
+      run: |
+        rsync -r --stats \
+          --delete \
+          --exclude="*" \
+          --include="apt/*" --exclude="apt/archives/*" \
+          --include="pacman/*" \
+          /var/cache/ ${{ runner.temp }}/cache/
