@@ -41,6 +41,10 @@ inputs:
   gpg-passphrase:
     description: 'phrase to decrypt the gpg secret key if given'
     required: false
+  cache-dir:
+    description: 'directory to save apt and pacman cache in'
+    required: false
+    default: ${{ runner.temp }}/system-cache/
   cdn77-host:
     description: 'cdn77 upload credentials'
     required: false
@@ -79,7 +83,7 @@ runs:
   steps:
     - name: copy-cache-to-pkg
       shell: bash
-      run: mkdir -p ${{ runner.temp }}/system-cache/ && rsync -r --stats ${{ runner.temp }}/system-cache/ /var/cache/
+      run: mkdir -p ${{ inputs.cache-dir }} && rsync -vu ${{ inputs.cache-dir }}/ /var/cache/
     - id: install-build-dependencies
       shell: bash
       run: |
@@ -210,7 +214,7 @@ runs:
         [ "$SCOPE" == "minimal" ] && unset SCOPE
 
         sudo sed -i -e 's|dist_name=$(get_distname)|dist_name=Manjaro|g' /usr/lib/manjaro-tools/util.sh
-        sudo sed -i -e 's|iso_name=$(get_osid)|iso_name=manjaro|g' /usr/lib/manjaro-tools/util.sh
+        sudo sed -i -e 's|iso_nameavzn=$(get_osid)|iso_name=manjaro|g' /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e "s|build_mirror='https://manjaro.moson.eu'|build_mirror='https://mirror.easyname.at/manjaro'|g" /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e "s|dist_release=\$(get_release)|dist_release=$VERSION|g" /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e "s|dist_codename=\$(get_codename)|dist_codename=\"$CODE_NAME\"|g" /usr/lib/manjaro-tools/util.sh
@@ -349,9 +353,9 @@ runs:
     - name: copy-pkgs-to-cache
       shell: bash
       run: |
-        rsync -r --stats \
+        rsync -vu \
           --delete \
           --exclude="*" \
           --include="apt/*" --exclude="apt/archives/*" \
           --include="pacman/*" \
-          /var/cache/ ${{ runner.temp }}/cache/
+          /var/cache/ ${{ inputs.cache-dir }}/
