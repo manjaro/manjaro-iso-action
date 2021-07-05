@@ -34,9 +34,9 @@ jobs:
           access_token: ${{ github.token }}
       - uses: actions/checkout@v2
       - id: cache-key
-        # this basically busts the cache every week
-        run: echo "::set-output name=key::system-cache-$(/bin/date -u "+%Y%U")"
         shell: bash
+        # this basically busts the cache every week
+        run: echo "::set-output name=key::system-cache-$(/bin/date -u "+%Y%U")-v1"
       - id: cache
         uses: actions/cache@v2
         with:
