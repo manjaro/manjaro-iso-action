@@ -77,9 +77,6 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: copy-cache-to-pkg
-      shell: bash
-      run: mkdir -p ${{ runner.temp }}/system-cache/ && rsync -r --stats ${{ runner.temp }}/system-cache/ /var/cache/
     - id: install-build-dependencies
       shell: bash
       run: |
@@ -355,12 +352,3 @@ runs:
           gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
             ./${{ steps.image-build.outputs.file-path }}+(.z*|.sha*|.pkgs|.sig|.torrent)
         fi
-    - name: copy-pkgs-to-cache
-      shell: bash
-      run: |
-        rsync -r --stats \
-          --delete \
-          --exclude="*" \
-          --include="apt/*" --exclude="apt/archives/*" \
-          --include="pacman/*" \
-          /var/cache/ ${{ runner.temp }}/cache/
