@@ -108,29 +108,36 @@ runs:
           libisoburn1 \
           squashfs-tools \
           docbook2x \
-          mktorrent
+          mktorrent \
+          doxygen \
+          python3-pip
+        sudo pip3 install meson
+        sudo pip3 install ninja
     - id: install-pacman
       shell: bash
       env:
-        PACMAN_VERSION: 5.2.2
+        PACMAN_VERSION: 6.0.0
       run: |
         sudo git clone --depth 1 https://gitlab.manjaro.org/packages/core/pacman.git
         pushd pacman
-        sudo wget https://sources.archlinux.org/other/pacman/pacman-${PACMAN_VERSION}.tar.gz
-        sudo tar -xvf pacman-${PACMAN_VERSION}.tar.gz
-        pushd pacman-${PACMAN_VERSION}
-        sudo patch -p1 -i ../pacman-sync-first-option.patch
-        sudo ./configure --prefix=/usr --sysconfdir=/etc \
-          --localstatedir=/var --enable-doc \
-          --with-scriptlet-shell=/usr/bin/bash \
-          --with-ldconfig=/usr/bin/ldconfig
-        sudo make V=1
-        sudo make install
-        popd
-        sudo install -m644 pacman.conf /etc/pacman.conf
-        sudo install -m644 makepkg.conf /etc/
-        sudo mkdir -p /etc/pacman.d
-        sudo touch /etc/pacman.d/mirrorlist
+          sudo wget https://sources.archlinux.org/other/pacman/pacman-${PACMAN_VERSION}.tar.xz
+          sudo tar -xvf pacman-${PACMAN_VERSION}.tar.xz
+          pushd pacman-${PACMAN_VERSION}
+            sudo patch -p1 -i ../pacman-sync-first-option.patch
+            sudo meson --prefix=/usr \
+                      --buildtype=plain \
+                      -Ddoc=disabled \
+                      -Ddoxygen=enabled \
+                      -Dscriptlet-shell=/usr/bin/bash \
+                      -Dldconfig=/usr/bin/ldconfig \
+                      build
+            sudo meson compile -C build
+            sudo meson install -C build
+          popd
+          sudo install -m644 pacman.conf /etc/pacman.conf
+          sudo install -m644 makepkg.conf /etc/
+          sudo mkdir -p /etc/pacman.d
+          sudo touch /etc/pacman.d/mirrorlist
         popd
     - id: install-keyrings
       shell: bash
