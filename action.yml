@@ -357,6 +357,10 @@ runs:
           zip -j -s 1950m ${{ steps.image-build.outputs.file-path }}.zip ${{ steps.image-build.outputs.file-path }}
           
           REMOTE_FILES=$(find . -maxdepth 1 -name "*.z*" -exec basename {} \; | xargs -I{} echo "\"${GITHUB_LINK}/{}\"")
+          if [ -n "${{ inputs.cdn77-host }}" ] && [ -n "${{ inputs.cdn77-user }}" ] && [ -n "${{ inputs.cdn77-pwd }}" ]; then 
+            REMOTE_FILES="${REMOTE_FILES} -w \"https://download.manjaro.org/${{ inputs.edition }}/${{ inputs.version }}/${{ steps.image-build.outputs.file-path }}\""
+          fi
+
           mktorrent -v -a udp://tracker.opentrackr.org:1337 -l 21 \
             ${REMOTE_FILES} \
             -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}.z*
