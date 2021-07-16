@@ -21,17 +21,15 @@ inputs:
     required: false
     default: full
   version:
-    description: 'dist_release version'
+    description: 'dist_release version (upstream if not given)'
     required: false
-    default: "21.0"
   kernel:
     description: 'kernel version'
     required: false
     default: linux510
   code-name:
-    description: 'manjaro code-name'
+    description: 'manjaro code-name (upstream if not given)'
     required: false
-    default: "Ornara"
   release-tag:
     description: 'release tag to upload to (if set)'
     required: false
@@ -213,11 +211,14 @@ runs:
         echo "## building iso"
         [ "$SCOPE" == "minimal" ] && unset SCOPE
 
-        sudo sed -i -e 's|dist_name=$(get_distname)|dist_name=Manjaro|g' /usr/lib/manjaro-tools/util.sh
+        # source the version info from current release info
+        source <(curl -s https://gitlab.manjaro.org/packages/core/manjaro-release/-/raw/master/lsb-release)
+
+        sudo sed -i -e 's|dist_name=$(get_distname)|dist_name=${DISTRIB_ID}|g' /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e 's|iso_name=$(get_osid)|iso_name=manjaro|g' /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e "s|build_mirror='https://manjaro.moson.eu'|build_mirror='https://mirror.easyname.at/manjaro'|g" /usr/lib/manjaro-tools/util.sh
-        sudo sed -i -e "s|dist_release=\$(get_release)|dist_release=$VERSION|g" /usr/lib/manjaro-tools/util.sh
-        sudo sed -i -e "s|dist_codename=\$(get_codename)|dist_codename=\"$CODE_NAME\"|g" /usr/lib/manjaro-tools/util.sh
+         &&  sudo sed -i -e "s|dist_release=\$(get_release)|dist_release=${VERSION:-$DISTRIB_RELEASE}|g" /usr/lib/manjaro-tools/util.sh || echo "no version given"
+        && sudo sed -i -e "s|dist_codename=\$(get_codename)|dist_codename=\"${CODE_NAME:-$DISTRIB_CODENAME}\"|g" /usr/lib/manjaro-tools/util.sh || echo "no code-name given"
         
         sudo buildiso ${SCOPE:+-f} -p $EDITION -b $BRANCH -k $KERNEL
         
