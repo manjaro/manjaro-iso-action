@@ -9,7 +9,7 @@ on:
     types: [closed]
 
 env:
-  version: test-release-${{ github.event.inputs.pr_number || github.event.number }}
+  version: ci-test-ignore-me-${{ github.event.inputs.pr_number || github.event.number }}
   edition: xfce
   SSH_AUTH_SOCK: /tmp/ssh_agent.sock
 
