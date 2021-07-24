@@ -5,7 +5,7 @@ on:
 env:
   ##### EDIT ME #####
   iso-profiles-git: https://gitlab.manjaro.org/profiles-and-settings/iso-profiles
-  version: test-release-${{ github.event.number }}
+  version: ci-test-ignore-me-${{ github.event.number }}
   ###################
 
 jobs:
