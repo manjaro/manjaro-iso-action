@@ -39,6 +39,9 @@ inputs:
   gpg-passphrase:
     description: 'phrase to decrypt the gpg secret key if given'
     required: false
+  additional-trusted-gpg:
+    description: 'gpg keyids that pacman should trust'
+    required: false
   cdn77-host:
     description: 'cdn77 upload credentials'
     required: false
@@ -154,6 +157,10 @@ runs:
 
         sudo pacman-key --init
         sudo pacman-key --populate archlinux manjaro
+
+        for gpg_key in ${{ inputs.additional-trusted-gpg }}; do
+          sudo pacman-key --keyserver keys.openpgp.org --recv-key $gpg_key
+        done
     - id: install-arch-install-scripts
       shell: bash
       env:
