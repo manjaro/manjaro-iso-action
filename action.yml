@@ -254,7 +254,7 @@ runs:
           exit 0
         fi
         echo "## gpg signing"
-        cat <(echo -e "${{ inputs.gpg-secret-key-base64 }}" | base64 --decode) | gpg --batch --import
+        cat <(echo -e "${{ inputs.gpg-secret-key-base64 }}" | base64 --decode) | gpg --batch --import &>/dev/null
         gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg-passphrase }}" --detach-sign ./${{ steps.image-build.outputs.file-path }}
     - id: upload-prepare
       shell: bash -O extglob {0}
