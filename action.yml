@@ -264,7 +264,7 @@ runs:
         touch /home/runner/.ssh/github_actions
         chmod 600 /home/runner/.ssh/github_actions
         ssh-agent -a /tmp/ssh_agent.sock > /dev/null
-        echo "::set-output name=upload-files::./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig|.torrent)"
+        echo "::set-output name=upload-files::./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig)"
         mkdir -p ${{ inputs.edition }}/${{ inputs.version }}
     - name: upload-cdn77
       shell: bash -O extglob {0}
@@ -350,26 +350,32 @@ runs:
         echo ${{ github.token }} | gh auth login --with-token
         gh release create ${{ inputs.release-tag }} --title ${{ inputs.release-tag }} --repo ${{ github.repository }} --notes "automated release" || echo "release already exists"
 
-        GITHUB_LINK=https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ inputs.release-tag }}
+        real_link () {
+          curl -w "%{url_effective}\n" -I -L -s -S https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ inputs.release-tag }}/$1 -o /dev/null
+        }
 
         if [[ -z "$(du --threshold=1950M ${{ steps.image-build.outputs.file-path }})" ]]; then
           # iso is small enough to upload already
-          mktorrent -v -a udp://tracker.opentrackr.org:1337 -l 21 \
-            -w "${GITHUB_LINK}/${{ steps.image-build.outputs.file-path }}" \
-            -w "https://download.manjaro.org/${{ inputs.edition }}/${{ inputs.version }}/${{ steps.image-build.outputs.file-path }}" \
-            -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}
-
           gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
             ${{ steps.upload-prepare.outputs.upload-files }}
+
+          mktorrent -v -a udp://tracker.opentrackr.org:1337 -l 21 \
+            -w "$( real_link ${{ steps.image-build.outputs.file-path }})" \
+            -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}
+
         else
           # iso is too big - creating a split-zip
           zip -j -s 1950m ${{ steps.image-build.outputs.file-path }}.zip ${{ steps.image-build.outputs.file-path }}
-          
-          REMOTE_FILES=$(find . -maxdepth 1 -name "*.z*" -exec basename {} \; | xargs -I{} echo "-w \"${GITHUB_LINK}/{}\"")
+
+          gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
+            ./${{ steps.image-build.outputs.file-path }}+(.z*|.sha*|.pkgs|.sig)
+
+          REMOTE_FILES=$(find . -maxdepth 1 -name "*.z*" -exec basename {} \; | xargs -I{} echo "-w \"$(real_link {})\"")
+
           mktorrent -v -a udp://tracker.opentrackr.org:1337 -l 21 \
             ${REMOTE_FILES} \
             -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}.z*
-
-          gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
-            ./${{ steps.image-build.outputs.file-path }}+(.z*|.sha*|.pkgs|.sig|.torrent)
         fi
+
+        gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
+          ./${{ steps.image-build.outputs.file-path }}.torrent
