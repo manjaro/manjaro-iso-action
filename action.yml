@@ -353,6 +353,7 @@ runs:
         real_link () {
           curl -w "%{url_effective}\n" -I -L -s -S https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ inputs.release-tag }}/$1 -o /dev/null
         }
+        rm *.torrent
 
         if [[ -z "$(du --threshold=1950M ${{ steps.image-build.outputs.file-path }})" ]]; then
           # iso is small enough to upload already
