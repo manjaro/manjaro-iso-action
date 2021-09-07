@@ -33,6 +33,9 @@ inputs:
   release-tag:
     description: 'release tag to upload to (if set)'
     required: false
+  custom-repo:
+    description: 'use custom repo'
+    required: false
   office-chooser:
     description: 'include CAL office installer module'
     required: false
@@ -200,6 +203,8 @@ runs:
         sudo sed -i -e 's|File|Path|' /usr/share/libalpm/hooks/*hook
     - id: install-manjaro-tools
       shell: bash
+      env:
+        CUSTOM_REPO: ${{ inputs.custom-repo }}
       run: |
         sudo git clone --depth 1 https://gitlab.manjaro.org/tools/development-tools/manjaro-tools.git
         cd manjaro-tools
@@ -207,6 +212,10 @@ runs:
         sudo make SYSCONFDIR=/etc PREFIX=/usr install_base
         sudo make SYSCONFDIR=/etc PREFIX=/usr install_yaml
         sudo make SYSCONFDIR=/etc PREFIX=/usr install_iso
+        if [ ! -z ${CUSTOM_REPO} ]; then
+          echo "## adding repo [${CUSTOM_REPO}]"
+          sudo sed -i -e "s/\[core\]/\[${CUSTOM_REPO}\]\nSigLevel = PackageRequired\nInclude = \/etc\/pacman\.d\/mirrorlist\n\n\[core\]/" /usr/share/manjaro-tools/pacman-multilib.conf
+        fi
     - id: checkout-iso-profiles
       shell: bash
       env:
