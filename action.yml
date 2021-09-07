@@ -225,7 +225,7 @@ runs:
         OFFICE: ${{ inputs.office-chooser }}
       run: |
         echo "## building iso"
-        [ "$SCOPE" == "minimal" ] && unset SCOPE
+        [ "$SCOPE" == "minimal" ] && unset SCOPE && unset OFFICE
         [ "$OFFICE" == "false" ] && unset OFFICE
 
         # source the version info from current release info
