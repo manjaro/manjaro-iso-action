@@ -33,6 +33,10 @@ inputs:
   release-tag:
     description: 'release tag to upload to (if set)'
     required: false
+  office-chooser:
+    description: 'include CAL office installer module'
+    required: false
+    default: false
   gpg-secret-key-base64:
     description: 'base64 encoded gpg secret key (without a passphrase) to sign the zip (if set)'
     required: false
@@ -218,9 +222,11 @@ runs:
         VERSION: ${{ inputs.version }}
         KERNEL: ${{ inputs.kernel }}
         CODE_NAME: ${{ inputs.code-name }}
+        OFFICE: ${{ inputs.office-chooser }}
       run: |
         echo "## building iso"
         [ "$SCOPE" == "minimal" ] && unset SCOPE
+        [ "$OFFICE" == "false" ] && unset OFFICE
 
         # source the version info from current release info
         source <(curl -s https://gitlab.manjaro.org/packages/core/manjaro-release/-/raw/master/lsb-release)
@@ -231,8 +237,8 @@ runs:
         sudo sed -i -e "s|dist_codename=\$(get_codename)|dist_codename=\"${CODE_NAME:-$DISTRIB_CODENAME}\"|g" /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e "s|build_mirror='https://manjaro.moson.eu'|build_mirror='https://mirror.moson.org/manjaro'|g" /usr/lib/manjaro-tools/util.sh
         
-        sudo buildiso ${SCOPE:+-f} -p $EDITION -b $BRANCH -k $KERNEL
-        
+        sudo buildiso ${SCOPE:+-f} -p $EDITION -b $BRANCH -k $KERNEL ${OFFICE:+-o}
+
         sudo rm -Rf /var/lib/manjaro-tools/buildiso/*
         
         OUTPUT_ISO_PATH=$(find /var/cache/manjaro-tools/iso -type f -name "*.iso" -exec stat -c '%Y %n' {} \; | sort -nr | awk 'NR==1 {print $2}')
