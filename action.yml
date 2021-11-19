@@ -223,7 +223,6 @@ runs:
 
         sudo sed -i -e "s|dist_name=\$(get_distname)|dist_name=${DISTRIB_ID%Linux}|g" /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e 's|iso_name=$(get_osid)|iso_name=manjaro|g' /usr/lib/manjaro-tools/util.sh
-        sudo sed -i -e "s|build_mirror='https://manjaro.moson.eu'|build_mirror='https://mirror.easyname.at/manjaro'|g" /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e "s|dist_release=\$(get_release)|dist_release=${VERSION:-$DISTRIB_RELEASE}|g" /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e "s|dist_codename=\$(get_codename)|dist_codename=\"${CODE_NAME:-$DISTRIB_CODENAME}\"|g" /usr/lib/manjaro-tools/util.sh
         
