@@ -354,11 +354,6 @@ runs:
 
         if [[ -z "$(du --threshold=1950M ${{ steps.image-build.outputs.file-path }})" ]]; then
           # iso is small enough to upload already
-          mktorrent -v -a udp://tracker.opentrackr.org:1337 -l 21 \
-            -w "${GITHUB_LINK}/${{ steps.image-build.outputs.file-path }}" \
-            -w "https://download.manjaro.org/${{ inputs.edition }}/${{ inputs.version }}/${{ steps.image-build.outputs.file-path }}" \
-            -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}
-
           gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
             ${{ steps.upload-prepare.outputs.upload-files }}
         else
@@ -366,10 +361,6 @@ runs:
           zip -j -s 1950m ${{ steps.image-build.outputs.file-path }}.zip ${{ steps.image-build.outputs.file-path }}
           
           REMOTE_FILES=$(find . -maxdepth 1 -name "*.z*" -exec basename {} \; | xargs -I{} echo "-w \"${GITHUB_LINK}/{}\"")
-          mktorrent -v -a udp://tracker.opentrackr.org:1337 -l 21 \
-            ${REMOTE_FILES} \
-            -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}.z*
-
           gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
             ./${{ steps.image-build.outputs.file-path }}+(.z*|.sha*|.pkgs|.sig|.torrent)
         fi
