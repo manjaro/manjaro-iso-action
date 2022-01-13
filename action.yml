@@ -141,9 +141,10 @@ runs:
     - id: install-keyrings
       shell: bash
       run: |
+        sudo install -dm755 /usr/share/pacman/keyrings/
+
         sudo git clone --depth 1 https://gitlab.manjaro.org/packages/core/manjaro-keyring.git
         pushd manjaro-keyring
-          sudo install -dm755 /usr/share/pacman/keyrings/
           sudo install -m0644 manjaro.gpg /usr/share/pacman/keyrings/
           sudo install -m0644 manjaro-trusted /usr/share/pacman/keyrings/
           sudo install -m0644 manjaro-trusted /usr/share/pacman/keyrings/
