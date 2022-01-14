@@ -33,6 +33,17 @@ inputs:
   release-tag:
     description: 'release tag to upload to (if set)'
     required: false
+  custom-repo:
+    description: 'name a custom repo to be prioritized above the default ones'
+    required: false
+  office-chooser:
+    description: 'include calamares office installer module'
+    required: false
+    default: "false"
+  build-mirror:
+    description: 'specific build mirror to use'
+    required: false
+    default: https://mirror.moson.org/manjaro
   gpg-secret-key-base64:
     description: 'base64 encoded gpg secret key (without a passphrase) to sign the zip (if set)'
     required: false
@@ -168,7 +179,7 @@ runs:
     - id: install-arch-install-scripts
       shell: bash
       env:
-        VERSION: 24
+        VERSION: "24"
       run: |
         sudo wget https://github.com/archlinux/arch-install-scripts/archive/refs/tags/v${VERSION}.tar.gz -O arch-install-scripts.tar.gz
         sudo tar -xvf arch-install-scripts.tar.gz
@@ -188,7 +199,7 @@ runs:
     - id: install-mkinitcpio
       shell: bash
       env:
-        VERSION: 30
+        VERSION: "30"
       run: |
         sudo wget https://gitlab.archlinux.org/mkinitcpio/mkinitcpio/-/archive/v${VERSION}/mkinitcpio-v${VERSION}.tar.gz
         sudo tar -xf mkinitcpio-v${VERSION}.tar.gz
@@ -196,6 +207,8 @@ runs:
         sudo sed -i -e 's|File|Path|' /usr/share/libalpm/hooks/*hook
     - id: install-manjaro-tools
       shell: bash
+      env:
+        CUSTOM_REPO: ${{ inputs.custom-repo }}
       run: |
         sudo git clone --depth 1 https://gitlab.manjaro.org/tools/development-tools/manjaro-tools.git
         cd manjaro-tools
@@ -203,6 +216,10 @@ runs:
         sudo make SYSCONFDIR=/etc PREFIX=/usr install_base
         sudo make SYSCONFDIR=/etc PREFIX=/usr install_yaml
         sudo make SYSCONFDIR=/etc PREFIX=/usr install_iso
+        if [ ! -z ${CUSTOM_REPO} ]; then
+          echo "## adding repo [${CUSTOM_REPO}]"
+          sudo sed -i -e "s/\[core\]/\[${CUSTOM_REPO}\]\nSigLevel = PackageRequired\nInclude = \/etc\/pacman\.d\/mirrorlist\n\n\[core\]/" /usr/share/manjaro-tools/pacman-multilib.conf
+        fi
     - id: checkout-iso-profiles
       shell: bash
       env:
@@ -218,9 +235,12 @@ runs:
         VERSION: ${{ inputs.version }}
         KERNEL: ${{ inputs.kernel }}
         CODE_NAME: ${{ inputs.code-name }}
+        OFFICE: ${{ inputs.office-chooser }}
+        BUILD_MIRROR: ${{ inputs.build-mirror }}
       run: |
         echo "## building iso"
-        [ "$SCOPE" == "minimal" ] && unset SCOPE
+        [ "$SCOPE" == "minimal" ] && unset SCOPE && unset OFFICE
+        [ "$OFFICE" == "false" ] && unset OFFICE
 
         # source the version info from current release info
         source <(curl -s https://gitlab.manjaro.org/packages/core/manjaro-release/-/raw/master/lsb-release)
@@ -229,10 +249,10 @@ runs:
         sudo sed -i -e 's|iso_name=$(get_osid)|iso_name=manjaro|g' /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e "s|dist_release=\$(get_release)|dist_release=${VERSION:-$DISTRIB_RELEASE}|g" /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e "s|dist_codename=\$(get_codename)|dist_codename=\"${CODE_NAME:-$DISTRIB_CODENAME}\"|g" /usr/lib/manjaro-tools/util.sh
-        sudo sed -i -e "s|build_mirror='https://manjaro.moson.eu'|build_mirror='https://mirror.moson.org/manjaro'|g" /usr/lib/manjaro-tools/util.sh
+        sudo sed -i -e "s|build_mirror='https://manjaro.moson.eu'|build_mirror=\'${BUILD_MIRROR}\'|g" /usr/lib/manjaro-tools/util.sh
         
-        sudo buildiso ${SCOPE:+-f} -p $EDITION -b $BRANCH -k $KERNEL
-        
+        sudo buildiso ${SCOPE:+-f} -p $EDITION -b $BRANCH -k $KERNEL ${OFFICE:+-o}
+
         sudo rm -Rf /var/lib/manjaro-tools/buildiso/*
         
         OUTPUT_ISO_PATH=$(find /var/cache/manjaro-tools/iso -type f -name "*.iso" -exec stat -c '%Y %n' {} \; | sort -nr | awk 'NR==1 {print $2}')
