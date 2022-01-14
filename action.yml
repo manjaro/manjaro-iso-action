@@ -34,12 +34,16 @@ inputs:
     description: 'release tag to upload to (if set)'
     required: false
   custom-repo:
-    description: 'use custom repo'
+    description: 'name a custom repo to be prioritized above the default ones'
     required: false
   office-chooser:
-    description: 'include CAL office installer module'
+    description: 'include calamares office installer module'
     required: false
-    default: false
+    default: "false"
+  build-mirror:
+    description: 'specific build mirror to use'
+    required: false
+    default: https://mirror.moson.org/manjaro
   gpg-secret-key-base64:
     description: 'base64 encoded gpg secret key (without a passphrase) to sign the zip (if set)'
     required: false
@@ -175,7 +179,7 @@ runs:
     - id: install-arch-install-scripts
       shell: bash
       env:
-        VERSION: 24
+        VERSION: "24"
       run: |
         sudo wget https://github.com/archlinux/arch-install-scripts/archive/refs/tags/v${VERSION}.tar.gz -O arch-install-scripts.tar.gz
         sudo tar -xvf arch-install-scripts.tar.gz
@@ -195,7 +199,7 @@ runs:
     - id: install-mkinitcpio
       shell: bash
       env:
-        VERSION: 30
+        VERSION: "30"
       run: |
         sudo wget https://gitlab.archlinux.org/mkinitcpio/mkinitcpio/-/archive/v${VERSION}/mkinitcpio-v${VERSION}.tar.gz
         sudo tar -xf mkinitcpio-v${VERSION}.tar.gz
@@ -232,6 +236,7 @@ runs:
         KERNEL: ${{ inputs.kernel }}
         CODE_NAME: ${{ inputs.code-name }}
         OFFICE: ${{ inputs.office-chooser }}
+        BUILD_MIRROR: ${{ inputs.build-mirror }}
       run: |
         echo "## building iso"
         [ "$SCOPE" == "minimal" ] && unset SCOPE && unset OFFICE
@@ -244,7 +249,7 @@ runs:
         sudo sed -i -e 's|iso_name=$(get_osid)|iso_name=manjaro|g' /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e "s|dist_release=\$(get_release)|dist_release=${VERSION:-$DISTRIB_RELEASE}|g" /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e "s|dist_codename=\$(get_codename)|dist_codename=\"${CODE_NAME:-$DISTRIB_CODENAME}\"|g" /usr/lib/manjaro-tools/util.sh
-        sudo sed -i -e "s|build_mirror='https://manjaro.moson.eu'|build_mirror='https://mirror.moson.org/manjaro'|g" /usr/lib/manjaro-tools/util.sh
+        sudo sed -i -e "s|build_mirror='https://manjaro.moson.eu'|build_mirror=\'${BUILD_MIRROR}\'|g" /usr/lib/manjaro-tools/util.sh
         
         sudo buildiso ${SCOPE:+-f} -p $EDITION -b $BRANCH -k $KERNEL ${OFFICE:+-o}
 
