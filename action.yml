@@ -119,10 +119,9 @@ runs:
           docbook2x \
           mktorrent \
           doxygen \
-          python3-pip \
           zstd
-        sudo pip3 install meson
-        sudo pip3 install ninja
+        sudo python3 -m pip install meson
+        sudo python3 -m pip install ninja
     - id: install-pacman
       shell: bash
       env:
