@@ -157,7 +157,7 @@ runs:
         pushd manjaro-keyring
           sudo install -m0644 manjaro.gpg /usr/share/pacman/keyrings/
           sudo install -m0644 manjaro-trusted /usr/share/pacman/keyrings/
-          sudo install -m0644 manjaro-trusted /usr/share/pacman/keyrings/
+          sudo install -m0644 manjaro-revoked /usr/share/pacman/keyrings/
         popd
 
         mkdir -p archlinux-keyring
