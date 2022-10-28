@@ -29,7 +29,7 @@ jobs:
         SCOPE: [minimal]
         ###################
     steps:
-      - uses: styfle/cancel-workflow-action@89f242ee29e10c53a841bfe71cc0ce7b2f065abc # tag=0.9.0
+      - uses: styfle/cancel-workflow-action@b173b6ec0100793626c2d9e6b90435061f4fc3e5 # tag=0.11.0
         with:
           access_token: ${{ github.token }}
       - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # tag=v2
