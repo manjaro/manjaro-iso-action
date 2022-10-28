@@ -257,7 +257,7 @@ runs:
         OUTPUT_ISO_PATH=$(find /var/cache/manjaro-tools/iso -type f -name "*.iso" -exec stat -c '%Y %n' {} \; | sort -nr | awk 'NR==1 {print $2}')
         TARGET_ISO_PATH=$(basename $OUTPUT_ISO_PATH)
         mv $OUTPUT_ISO_PATH ./$TARGET_ISO_PATH
-        echo "::set-output name=file-path::$TARGET_ISO_PATH"
+        echo "file-path=$TARGET_ISO_PATH" >> $GITHUB_OUTPUT
 
         FILE_PKG=$(find /var/cache/manjaro-tools/iso -type f -name "*-pkgs.txt" -exec stat -c '%Y %n' {} \; | sort -nr | awk 'NR==1 {print $2}')
         mv $FILE_PKG ./${TARGET_ISO_PATH}.pkgs
@@ -287,7 +287,7 @@ runs:
         touch /home/runner/.ssh/github_actions
         chmod 600 /home/runner/.ssh/github_actions
         ssh-agent -a /tmp/ssh_agent.sock > /dev/null
-        echo "::set-output name=upload-files::./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig|.torrent)"
+        echo "upload-files=./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig|.torrent)" >> $GITHUB_OUTPUT
         mkdir -p ${{ inputs.edition }}/${{ inputs.version }}
     - name: upload-cdn77
       shell: bash -O extglob {0}
