@@ -1,0 +1,11 @@
+{
+  "automerge": true,
+  "enabled": true,
+  "extends": ["helpers:pinGitHubActionDigests"],
+  "labels": ["dependency"],
+  "github-actions": {
+    "enabled": true
+  },
+  "prConcurrentLimit": 1,
+  "semanticCommits": "enabled"
+}
