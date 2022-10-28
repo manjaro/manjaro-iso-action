@@ -50,7 +50,7 @@ jobs:
           sf-project: manjarolinux
           sf-user: ${{ secrets.SF_USER_NAME }}
           sf-key: ${{ secrets.SF_PRIV_SSHKEY }}
-          custom-repo: 
+          # custom-repo: 
           office-chooser: true
           build-mirror: ${{ secrets.BUILD_MIRROR }}
           # osdn is absurdly slow sometimes
