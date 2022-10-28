@@ -363,7 +363,7 @@ runs:
     - id: upload-github-release
       shell: bash -O extglob {0}
       env:
-        LIMIT_MB: 2000
+        LIMIT_MB: '2000'
       run: |
         # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
         if [ -z "${{ inputs.release-tag }}" ]; then 
