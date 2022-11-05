@@ -121,7 +121,7 @@ runs:
           doxygen \
           zstd
         sudo python3 -m pip install meson
-        sudo python3 -m pip install ninja
+        sudo python3 -m pip install ninja==1.10.2.4
     - id: install-pacman
       shell: bash
       env:
