@@ -178,7 +178,7 @@ runs:
     - id: install-arch-install-scripts
       shell: bash
       env:
-        VERSION: "24"
+        VERSION: "27"
       run: |
         sudo wget https://github.com/archlinux/arch-install-scripts/archive/refs/tags/v${VERSION}.tar.gz -O arch-install-scripts.tar.gz
         sudo tar -xvf arch-install-scripts.tar.gz
