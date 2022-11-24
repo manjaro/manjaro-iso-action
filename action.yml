@@ -129,7 +129,7 @@ runs:
     - id: install-pacman
       shell: bash
       env:
-        PACMAN_VERSION: 6.0.1
+        PACMAN_VERSION: 6.0.2
       run: |
         sudo git clone --depth 1 https://gitlab.manjaro.org/packages/core/pacman.git
         pushd pacman
