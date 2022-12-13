@@ -12,7 +12,7 @@ jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@7dd9e2a3dc350cf687eb1b2a4fadfee8c8e49675 # v3
+      - uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b # v3
       - name: delete test-release
         run: |
           echo ${{ github.token }} | gh auth login --with-token
@@ -32,7 +32,7 @@ jobs:
       - uses: styfle/cancel-workflow-action@b173b6ec0100793626c2d9e6b90435061f4fc3e5 # tag=0.11.0
         with:
           access_token: ${{ github.token }}
-      - uses: actions/checkout@7dd9e2a3dc350cf687eb1b2a4fadfee8c8e49675 # v3
+      - uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b # v3
       - id: image-build
         uses: ./
         with:
