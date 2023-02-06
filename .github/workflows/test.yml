@@ -42,7 +42,7 @@ jobs:
           scope: ${{ matrix.scope }}
           version: ${{ env.version }}
           release-tag: ${{ env.version }}
-          gpg-secret-key-base64: ${{ secrets.GPG_SECRET_KEY_BASE64 }}
+          gpg-secret-key-base64: ${{ secrets.gpg_secret_base64 }}
           gpg-passphrase: 1234
           cdn77-host: ${{ secrets.CDN_HOST }}
           cdn77-user: ${{ secrets.CDN_USER }}

@@ -92,7 +92,7 @@ jobs:
   uses: manjaro/manjaro-iso-action@main
   with:
     ...
-    gpg-secret-key-base64: ${{ secrets.GPG_SECRET_KEY_BASE64 }}
+    gpg-secret-key-base64: ${{ secrets.gpg_secret_base64 }}
     gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
 ```
 
