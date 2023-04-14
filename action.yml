@@ -129,7 +129,7 @@ runs:
       run: |
         sudo git clone --depth 1 https://gitlab.manjaro.org/packages/core/pacman.git
         pushd pacman
-          sudo wget https://sources.archlinux.org/other/pacman/pacman-${PACMAN_VERSION}.tar.xz
+          sudo curl --compressed -sLO https://sources.archlinux.org/other/pacman/pacman-${PACMAN_VERSION}.tar.xz
           sudo tar -xvf pacman-${PACMAN_VERSION}.tar.xz
           pushd pacman-${PACMAN_VERSION}
             sudo patch -p1 -i ../pacman-sync-first-option.patch
