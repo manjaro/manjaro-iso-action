@@ -129,7 +129,7 @@ runs:
       run: |
         sudo git clone --depth 1 https://gitlab.manjaro.org/packages/core/pacman.git
         pushd pacman
-          sudo curl --compressed -sLO https://sources.archlinux.org/other/pacman/pacman-${PACMAN_VERSION}.tar.xz
+          sudo curl -sLO https://sources.archlinux.org/other/pacman/pacman-${PACMAN_VERSION}.tar.xz
           sudo tar -xvf pacman-${PACMAN_VERSION}.tar.xz
           pushd pacman-${PACMAN_VERSION}
             sudo patch -p1 -i ../pacman-sync-first-option.patch
@@ -162,7 +162,7 @@ runs:
 
         mkdir -p archlinux-keyring
         pushd archlinux-keyring
-          curl --compressed -sL https://archlinux.org/packages/core/any/archlinux-keyring/download -o /tmp/archlinux-keyring.tar.zst
+          curl -sL https://archlinux.org/packages/core/any/archlinux-keyring/download -o /tmp/archlinux-keyring.tar.zst
           tar --use-compress-program=unzstd --strip-components=4 --wildcards -xvf /tmp/archlinux-keyring.tar.zst usr/share/pacman/keyrings/*
           sudo install -m0644 archlinux.gpg /usr/share/pacman/keyrings/
           sudo install -m0644 archlinux-trusted /usr/share/pacman/keyrings/
@@ -180,13 +180,13 @@ runs:
       env:
         VERSION: "27"
       run: |
-        sudo curl --compressed -sL https://github.com/archlinux/arch-install-scripts/archive/refs/tags/v${VERSION}.tar.gz -o arch-install-scripts.tar.gz
+        sudo curl -sL https://github.com/archlinux/arch-install-scripts/archive/refs/tags/v${VERSION}.tar.gz -o arch-install-scripts.tar.gz
         sudo tar -xvf arch-install-scripts.tar.gz
         sudo make -C arch-install-scripts-${VERSION}
         sudo make -C arch-install-scripts-${VERSION} check
         sudo make -C arch-install-scripts-${VERSION} PREFIX=/usr install
         
-        sudo curl --compressed -sL https://gitlab.manjaro.org/applications/pacman-mirrors/-/raw/v4.19x-stable/conf/pacman-mirrors.conf -o /etc/pacman-mirrors.conf
+        sudo curl -sL https://gitlab.manjaro.org/applications/pacman-mirrors/-/raw/v4.19x-stable/conf/pacman-mirrors.conf -o /etc/pacman-mirrors.conf
     - id: install-calamares-tools
       shell: bash
       run: |
@@ -200,7 +200,7 @@ runs:
       env:
         VERSION: "32"
       run: |
-        sudo curl --compressed -sLO https://gitlab.archlinux.org/archlinux/mkinitcpio/mkinitcpio/-/archive/v${VERSION}/mkinitcpio-v${VERSION}.tar.gz
+        sudo curl -sLO https://gitlab.archlinux.org/archlinux/mkinitcpio/mkinitcpio/-/archive/v${VERSION}/mkinitcpio-v${VERSION}.tar.gz
         sudo tar -xf mkinitcpio-v${VERSION}.tar.gz
         sudo make -C mkinitcpio-v${VERSION} install
         sudo sed -i -e 's|File|Path|' /usr/share/libalpm/hooks/*hook
