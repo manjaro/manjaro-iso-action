@@ -43,7 +43,7 @@ inputs:
   build-mirror:
     description: 'specific build mirror to use'
     required: false
-    default: https://mirror.moson.org/manjaro
+    default: https://mirror.easyname.at/manjaro
   gpg-secret-key-base64:
     description: 'base64 encoded gpg secret key (without a passphrase) to sign the zip (if set)'
     required: false
