@@ -19,7 +19,7 @@ jobs:
           gh release delete ${{ env.version }} -y --repo ${{ github.repository }} || exit 0
           git push --delete origin ${{ env.version }}
   build-release:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: [cleanup]
     strategy:
       matrix:
