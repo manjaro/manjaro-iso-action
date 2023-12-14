@@ -190,7 +190,7 @@ runs:
         sudo make -C arch-install-scripts-${VERSION} check
         sudo make -C arch-install-scripts-${VERSION} PREFIX=/usr install
         
-        sudo wget https://gitlab.manjaro.org/applications/pacman-mirrors/-/raw/master/conf/pacman-mirrors.conf -O /etc/pacman-mirrors.conf
+        sudo wget https://gitlab.manjaro.org/applications/pacman-mirrors/-/tree/master/data/etc/pacman-mirrors.conf -O /etc/pacman-mirrors.conf
     - id: install-calamares-tools
       shell: bash
       run: |
