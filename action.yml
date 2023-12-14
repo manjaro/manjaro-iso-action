@@ -370,10 +370,12 @@ runs:
         # copy config
         echo "${{ inputs.s3-cfg }}" > /home/runner/.s3cfg
 
-        # create directory structure locally
         echo "check file source"
-        ls "./${{ steps.image-build.outputs.file-path }}/"
-        mv "./${{ steps.image-build.outputs.file-path }}/*" "${{ inputs.edition }}/${{ inputs.version }}/"
+        ls .
+        for f in ${{ steps.upload-prepare.outputs.upload-files[@] }}; do
+          echo "moving ${f}"
+          mv ${f} "${{ inputs.edition }}/${{ inputs.version }}/"
+        done
         echo "check target
         ls "${{ inputs.edition }}/${{ inputs.version }}"
         
