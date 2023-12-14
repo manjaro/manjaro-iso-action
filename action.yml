@@ -301,49 +301,6 @@ runs:
         ssh-agent -a /tmp/ssh_agent.sock > /dev/null
         echo "upload-files=./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig|.torrent)" >> $GITHUB_OUTPUT
         mkdir -p ${{ inputs.edition }}/${{ inputs.version }}
-    - name: upload-cdn77
-      shell: bash -O extglob {0}
-      run: |
-        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
-        if [ -z "${{ inputs.cdn77-host }}" ] || [ -z "${{ inputs.cdn77-user }}" ] || [ -z "${{ inputs.cdn77-pwd }}" ]; then 
-          echo "## not (all) credentials given for cdn77 upload"
-          exit 0
-        fi
-        echo "## cdn77 upload"
-        
-        mktorrent -v -a udp://tracker.opentrackr.org:1337 -l 21 \
-          -w "https://download.manjaro.org/${{ inputs.edition }}/${{ inputs.version }}/${{ steps.image-build.outputs.file-path }}" \
-          -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}
-        
-        ssh-keyscan -t rsa ${{ inputs.cdn77-host }} >> /home/runner/.ssh/known_hosts
-
-        ## create target dir
-        sshpass -p "${{ inputs.cdn77-pwd }}" rsync -vaP --stats -e ssh ${{ inputs.edition }} \
-          ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/
-
-        # upload
-        sshpass -p "${{ inputs.cdn77-pwd }}" rsync -vaP \
-          --stats -e ssh ${{ steps.upload-prepare.outputs.upload-files }} \
-          ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/${{ inputs.edition }}/${{ inputs.version }}/
-    - name: upload-cdn77-s3
-      shell: bash -O extglob {0}
-      run: |
-        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
-        if [ -z "${{ inputs.s3-cfg }}" ]; then
-          echo "## credentials for cdn77 S3 upload not provided. Skipping."
-          exit 0
-        fi
-        echo "## cdn77 S3 upload"
-
-        mktorrent -v -a udp://tracker.opentrackr.org:1337 -l 21 \
-          -w "https://download.manjaro.org/${{ inputs.edition }}/${{ inputs.version }}/${{ steps.image-build.outputs.file-path }}" \
-          -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}
-
-        # copy config
-        echo "${{ inputs.s3-cfg }}" > /home/runner/.s3cfg
-
-        # upload
-        s3cmd sync --progress --recursive -F "${{ inputs.edition }}" s3://s3downloadseu/ -v
     - name: upload-sourceforge
       shell: bash -O extglob {0}
       env:
@@ -367,30 +324,6 @@ runs:
         ## upload
         rsync -vaP --stats -e ssh ${{ steps.upload-prepare.outputs.upload-files }} \
           ${{ inputs.sf-user }}@frs.sourceforge.net:/home/frs/project/${{ inputs.sf-project }}/${{ inputs.edition }}/${{ inputs.version }}/
-    - name: upload-osdn
-      shell: bash -O extglob {0}
-      env:
-        SSH_AUTH_SOCK: /tmp/ssh_agent.sock
-      run: |
-        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
-        if [ -z "${{ inputs.osdn-project }}" ] || [ -z "${{ inputs.osdn-user }}" ] || [ -z "${{ inputs.osdn-key }}" ]; then 
-          echo "## not (all) credentials given for osdn upload"
-          exit 0
-        fi
-        echo "## osdn upload"
-
-        ssh-keyscan -t rsa storage.osdn.net >> /home/runner/.ssh/known_hosts
-        echo "${{ inputs.osdn-key }}" >> /home/runner/.ssh/github_actions
-        ssh-add /home/runner/.ssh/github_actions
-
-        ## create target dir
-        rsync -vaP --stats -e ssh ${{ inputs.edition }} \
-          ${{ inputs.osdn-user }}@storage.osdn.net:/storage/groups/m/ma/${{ inputs.osdn-project }}/
-
-        OSDN_GROUP=$(echo ${{ inputs.osdn-project }} | cut -c 1)/$(echo ${{ inputs.osdn-project }} | cut -c 1-2)
-
-        rsync -vaP --stats -e ssh ${{ steps.upload-prepare.outputs.upload-files }} \
-          ${{ inputs.osdn-user }}@storage.osdn.net:/storage/groups/${OSDN_GROUP}/${{ inputs.osdn-project }}/${{ inputs.edition }}/${{ inputs.version }}/
     - id: upload-github-release
       shell: bash -O extglob {0}
       env:
@@ -420,3 +353,26 @@ runs:
           gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
             ./${{ steps.image-build.outputs.file-path }}+(.z*|.sha*|.pkgs|.sig|.torrent)
         fi
+    - name: upload-cdn77-s3
+      shell: bash -O extglob {0}
+      run: |
+        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
+        if [ -z "${{ inputs.s3-cfg }}" ]; then
+          echo "## credentials for cdn77 S3 upload not provided. Skipping."
+          exit 0
+        fi
+        echo "## cdn77 S3 upload"
+
+        mktorrent -v -a udp://tracker.opentrackr.org:1337 -l 21 \
+          -w "https://download.manjaro.org/${{ inputs.edition }}/${{ inputs.version }}/${{ steps.image-build.outputs.file-path }}" \
+          -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}
+
+        # copy config
+        echo "${{ inputs.s3-cfg }}" > /home/runner/.s3cfg
+
+        # create directory structure locally
+        mkdir -p {{ inputs.edition }}/${{ inputs.version }}
+        mv ${{ steps.upload-prepare.outputs.upload-files }} {{ inputs.edition }}/${{ inputs.version }}/
+        
+        # upload
+        s3cmd sync --progress --recursive -F "${{ inputs.edition }}" s3://s3downloadseu/ -v
