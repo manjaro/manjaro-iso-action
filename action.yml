@@ -376,7 +376,7 @@ runs:
           echo "moving ${f}"
           mv ${f} "${{ inputs.edition }}/${{ inputs.version }}/"
         done
-        echo "check target
+        echo "check target"
         ls "${{ inputs.edition }}/${{ inputs.version }}"
         
         # upload
