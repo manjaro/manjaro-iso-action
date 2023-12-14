@@ -361,25 +361,19 @@ runs:
           echo "## credentials for cdn77 S3 upload not provided. Skipping."
           exit 0
         fi
-        echo "## cdn77 S3 upload"
 
+        echo "## create torrent"
         mktorrent -v -a udp://tracker.opentrackr.org:1337 -l 21 \
           -w "https://download.manjaro.org/${{ inputs.edition }}/${{ inputs.version }}/${{ steps.image-build.outputs.file-path }}" \
           -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}
 
+        echo "## cdn77 S3 upload"
         # copy config
         echo "${{ inputs.s3-cfg }}" > /home/runner/.s3cfg
-
-        echo "check file source"
-        ls .
-        echo "${{ steps.upload-prepare.outputs.upload-files }}"
+        # create bash array and mv files to dir
         upload_files=( "${{ steps.upload-prepare.outputs.upload-files }}" )
         for f in ${upload_files[@]}; do
-          echo "moving ${f}"
           mv ${f} "${{ inputs.edition }}/${{ inputs.version }}/"
         done
-        echo "check target"
-        ls "${{ inputs.edition }}/${{ inputs.version }}"
-        
         # upload
-        s3cmd sync --progress --recursive -F "${{ inputs.edition }}" s3://s3downloadseu/ -v
+        s3cmd sync --progress --recursive -F "${{ inputs.edition }}" s3://s3downloadseu/
