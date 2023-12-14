@@ -325,6 +325,25 @@ runs:
         sshpass -p "${{ inputs.cdn77-pwd }}" rsync -vaP \
           --stats -e ssh ${{ steps.upload-prepare.outputs.upload-files }} \
           ${{ inputs.cdn77-user }}@${{ inputs.cdn77-host }}:/www/${{ inputs.edition }}/${{ inputs.version }}/
+    - name: upload-cdn77-s3
+      shell: bash -O extglob {0}
+      run: |
+        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
+        if [ -z "${{ inputs.s3-cfg }}" ]; then
+          echo "## credentials for cdn77 S3 upload not provided. Skipping."
+          exit 0
+        fi
+        echo "## cdn77 S3 upload"
+
+        mktorrent -v -a udp://tracker.opentrackr.org:1337 -l 21 \
+          -w "https://download.manjaro.org/${{ inputs.edition }}/${{ inputs.version }}/${{ steps.image-build.outputs.file-path }}" \
+          -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}
+
+        # copy config
+        cat ${{ inputs.s3-cfg }} > /home/runner/.s3cfg
+
+        # upload
+        s3cmd sync --progress --recursive -F --delete-removed "${{ inputs.edition }}" s3://s3downloadseu/
     - name: upload-sourceforge
       shell: bash -O extglob {0}
       env:
