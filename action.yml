@@ -371,8 +371,11 @@ runs:
         echo "${{ inputs.s3-cfg }}" > /home/runner/.s3cfg
 
         # create directory structure locally
-        mkdir -p {{ inputs.edition }}/${{ inputs.version }}
+        mkdir -vp {{ inputs.edition }}/${{ inputs.version }} -v
         mv ${{ steps.upload-prepare.outputs.upload-files }} {{ inputs.edition }}/${{ inputs.version }}/
+        # check
+        ls
+        ls {{ inputs.edition }}/${{ inputs.version }}
         
         # upload
         s3cmd sync --progress --recursive -F "${{ inputs.edition }}" s3://s3downloadseu/ -v
