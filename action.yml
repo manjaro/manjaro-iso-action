@@ -340,7 +340,7 @@ runs:
           -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}
 
         # copy config
-        cat ${{ inputs.s3-cfg }} > /home/runner/.s3cfg
+        echo ${{ inputs.s3-cfg }} > /home/runner/.s3cfg
 
         # upload
         s3cmd sync --progress --recursive -F "${{ inputs.edition }}" s3://s3downloadseu/
