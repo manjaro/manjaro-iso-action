@@ -80,6 +80,9 @@ inputs:
   osdn-key:
     description: 'osdn upload credentials'
     required: false
+  s3-cfg:
+    description: 'S3 config'
+    required: false
 
 outputs:
   file-path:
