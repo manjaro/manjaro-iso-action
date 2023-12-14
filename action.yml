@@ -372,7 +372,9 @@ runs:
 
         echo "check file source"
         ls .
-        for f in ${{ steps.upload-prepare.outputs.upload-files[@] }}; do
+        echo "${{ steps.upload-prepare.outputs.upload-files }}"
+        upload_files=( "${{ steps.upload-prepare.outputs.upload-files }}" )
+        for f in ${upload_files[@]}; do
           echo "moving ${f}"
           mv ${f} "${{ inputs.edition }}/${{ inputs.version }}/"
         done
