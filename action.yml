@@ -375,7 +375,7 @@ runs:
         ls "./${{ steps.image-build.outputs.file-path }}/"
         mv "./${{ steps.image-build.outputs.file-path }}/*" "${{ inputs.edition }}/${{ inputs.version }}/"
         echo "check target
-        ls "{{ inputs.edition }}/${{ inputs.version }}"
+        ls "${{ inputs.edition }}/${{ inputs.version }}"
         
         # upload
         s3cmd sync --progress --recursive -F "${{ inputs.edition }}" s3://s3downloadseu/ -v
