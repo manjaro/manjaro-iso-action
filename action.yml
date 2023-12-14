@@ -343,7 +343,7 @@ runs:
         cat ${{ inputs.s3-cfg }} > /home/runner/.s3cfg
 
         # upload
-        s3cmd sync --progress --recursive -F --delete-removed "${{ inputs.edition }}" s3://s3downloadseu/
+        s3cmd sync --progress --recursive -F "${{ inputs.edition }}" s3://s3downloadseu/
     - name: upload-sourceforge
       shell: bash -O extglob {0}
       env:
