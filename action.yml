@@ -178,6 +178,7 @@ runs:
 
         for gpg_key in ${{ inputs.additional-trusted-gpg }}; do
           sudo pacman-key --keyserver keys.openpgp.org --recv-key $gpg_key
+          sudo pacman-key --lsign-key $gpg_key
         done
     - id: install-arch-install-scripts
       shell: bash
