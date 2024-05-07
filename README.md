@@ -119,3 +119,58 @@ all distribution channels can be configured by setting / leaving out of their co
     gh release delete ${{ needs.prepare-release.outputs.release_tag }} -y --repo ${{ github.repository }}
     git push --delete origin ${{ needs.prepare-release.outputs.release_tag }}
 ```
+
+### cdn77 release
+
+```yaml
+- id: image-build
+  uses: manjaro/manjaro-iso-action@main
+  with:
+    ...
+    cdn77-host: ${{ secrets.CDN_HOST }}
+    cdn77-user: ${{ secrets.CDN_USER }}
+    cdn77-pwd: ${{ secrets.CDN_PWD }}
+- name: rollback cdn77 upload
+  if: ${{ failure() || cancelled() }}
+  run: |
+    sshpass -p "${{ secrets.CDN_PWD }}" rsync --delete -vaP --stats \
+        -e ssh $(mktemp) ${{ secrets.CDN_USER }}@${{ secrets.CDN_HOST }}:/www/${{ env.edition }}/${{ env.version }}
+```
+
+### SourceForge release
+
+```yaml
+- id: image-build
+  uses: manjaro/manjaro-iso-action@main
+  with:
+    ...
+    sf-project: manjarolinux
+    sf-user: ${{ secrets.SF_USER_NAME }}
+    sf-key: ${{ secrets.SF_PRIV_SSHKEY }}
+- name: rollback sourceforge upload
+  if: ${{ failure() || cancelled() }}
+  env:
+    SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+  run: |
+    rsync --delete -vaP --stats \
+        -e ssh $(mktemp) ${{ secrets.SF_USER_NAME }}@frs.sourceforge.net:/home/frs/project/manjarolinux/${{ env.edition }}/${{ env.version }}
+```
+
+### osdn release
+
+```yaml
+- id: image-build
+  uses: manjaro/manjaro-iso-action@main
+  with:
+    ...
+    osdn-project: manjaro
+    osdn-user: ${{ secrets.OSDN_USER_NAME }}
+    osdn-key: ${{ secrets.OSDN_PRIV_SSHKEY }}
+- name: rollback osdn upload
+  if: ${{ failure() || cancelled() }}
+  env:
+    SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+  run: |
+    rsync --delete -vaP --stats \
+        -e ssh $(mktemp) ${{ secrets.OSDN_USER_NAME }}@storage.osdn.net:/storage/groups/m/ma/manjaro/${{ env.edition }}/${{ env.version }}
+```

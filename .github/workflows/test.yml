@@ -25,7 +25,7 @@ jobs:
       matrix:
         ##### EDIT ME #####
         EDITION: [xfce]
-        BRANCH: [unstable]
+        BRANCH: [stable]
         SCOPE: [minimal]
         ###################
     steps:
@@ -42,6 +42,18 @@ jobs:
           scope: ${{ matrix.scope }}
           version: ${{ env.version }}
           release-tag: ${{ env.version }}
-          gpg-secret-key-base64: ${{ secrets.CI_PRIV_KEY }}
-          gpg-passphrase: ${{ secrets.CI_GPG_PASSPHRASE }}
+          gpg-secret-key-base64: ${{ secrets.gpg_secret_base64 }}
+          gpg-passphrase: 1234
+          cdn77-host: ${{ secrets.CDN_HOST }}
+          cdn77-user: ${{ secrets.CDN_USER }}
+          cdn77-pwd: ${{ secrets.CDN_PWD }}
+          sf-project: manjarolinux
+          sf-user: ${{ secrets.SF_USER_NAME }}
+          sf-key: ${{ secrets.SF_PRIV_SSHKEY }}
+          # custom-repo: 
+          office-chooser: true
           build-mirror: ${{ secrets.BUILD_MIRROR }}
+          # osdn is absurdly slow sometimes
+          # osdn-project: manjaro
+          # osdn-user: ${{ secrets.OSDN_USER_NAME }}
+          # osdn-key: ${{ secrets.OSDN_PRIV_SSHKEY }}

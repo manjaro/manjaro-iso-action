@@ -53,6 +53,36 @@ inputs:
   additional-trusted-gpg:
     description: 'gpg keyids that pacman should trust'
     required: false
+  cdn77-host:
+    description: 'cdn77 upload credentials'
+    required: false
+  cdn77-user:
+    description: 'cdn77 upload credentials'
+    required: false
+  cdn77-pwd:
+    description: 'cdn77 upload credentials'
+    required: false
+  sf-project:
+    description: 'sf upload credentials'
+    required: false
+  sf-user:
+    description: 'sf upload credentials'
+    required: false
+  sf-key:
+    description: 'sf upload credentials'
+    required: false
+  osdn-project:
+    description: 'osdn upload credentials'
+    required: false
+  osdn-user:
+    description: 'osdn upload credentials'
+    required: false
+  osdn-key:
+    description: 'osdn upload credentials'
+    required: false
+  s3-cfg:
+    description: 'S3 config'
+    required: false
 
 outputs:
   file-path:
@@ -271,6 +301,29 @@ runs:
         ssh-agent -a /tmp/ssh_agent.sock > /dev/null
         echo "upload-files=./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig|.torrent)" >> $GITHUB_OUTPUT
         mkdir -p ${{ inputs.edition }}/${{ inputs.version }}
+    - name: upload-sourceforge
+      shell: bash -O extglob {0}
+      env:
+        SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+      run: |
+        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
+        if [ -z "${{ inputs.sf-project }}" ] || [ -z "${{ inputs.sf-user }}" ] || [ -z "${{ inputs.sf-key }}" ]; then 
+          echo "## not (all) credentials given for sourceforge upload"
+          exit 0
+        fi
+        echo "## sourceforge upload"
+        
+        ssh-keyscan -t rsa frs.sourceforge.net >> /home/runner/.ssh/known_hosts
+        echo "${{ inputs.sf-key }}" >> /home/runner/.ssh/github_actions
+        ssh-add /home/runner/.ssh/github_actions
+
+        ## create target dir
+        rsync -vaP --stats -e ssh ${{ inputs.edition }} \
+          ${{ inputs.sf-user }}@frs.sourceforge.net:/home/frs/project/${{ inputs.sf-project }}/
+
+        ## upload
+        rsync -vaP --stats -e ssh ${{ steps.upload-prepare.outputs.upload-files }} \
+          ${{ inputs.sf-user }}@frs.sourceforge.net:/home/frs/project/${{ inputs.sf-project }}/${{ inputs.edition }}/${{ inputs.version }}/
     - id: upload-github-release
       shell: bash -O extglob {0}
       env:
@@ -300,4 +353,27 @@ runs:
           gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
             ./${{ steps.image-build.outputs.file-path }}+(.z*|.sha*|.pkgs|.sig|.torrent)
         fi
-  
+    - name: upload-cdn77-s3
+      shell: bash -O extglob {0}
+      run: |
+        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
+        if [ -z "${{ inputs.s3-cfg }}" ]; then
+          echo "## credentials for cdn77 S3 upload not provided. Skipping."
+          exit 0
+        fi
+
+        echo "## create torrent"
+        mktorrent -v -a udp://tracker.opentrackr.org:1337 -l 21 \
+          -w "https://download.manjaro.org/${{ inputs.edition }}/${{ inputs.version }}/${{ steps.image-build.outputs.file-path }}" \
+          -o ${{ steps.image-build.outputs.file-path }}.torrent ${{ steps.image-build.outputs.file-path }}
+
+        echo "## cdn77 S3 upload"
+        # copy config
+        echo "${{ inputs.s3-cfg }}" > /home/runner/.s3cfg
+        # create bash array and mv files to dir
+        upload_files=( "${{ steps.upload-prepare.outputs.upload-files }}" )
+        for f in ${upload_files[@]}; do
+          mv ${f} "${{ inputs.edition }}/${{ inputs.version }}/"
+        done
+        # upload
+        s3cmd sync --progress --recursive -F "${{ inputs.edition }}" s3://s3downloadseu/
