@@ -337,7 +337,7 @@ runs:
         echo "## github upload"
 
         echo ${{ github.token }} | gh auth login --with-token
-        gh release create ${{ inputs.release-tag }} --title ${{ inputs.release-tag }} --repo ${{ github.repository }} --notes "automated release" --prerelease || echo "release already exists"
+        gh release create ${{ inputs.release-tag }} --title ${{ inputs.release-tag }} --repo ${{ github.repository }} --notes "automated release" || echo "release already exists"
 
         GITHUB_LINK=https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ inputs.release-tag }}
 
