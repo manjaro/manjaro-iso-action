@@ -123,7 +123,8 @@ runs:
           mktorrent \
           doxygen \
           zstd \
-          s3cmd
+          s3cmd \
+          xorriso
         sudo python3 -m pip install meson
         sudo python3 -m pip install ninja
     - id: install-pacman
