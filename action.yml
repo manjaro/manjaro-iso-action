@@ -208,7 +208,7 @@ runs:
       env:
         CUSTOM_REPO: ${{ inputs.custom-repo }}
       run: |
-        sudo git clone --branch gaming --depth 1 https://gitlab.manjaro.org/tools/development-tools/manjaro-tools.git
+        sudo git clone --branch gaming-2025 --depth 1 https://gitlab.manjaro.org/tools/development-tools/manjaro-tools.git
         cd manjaro-tools
         sudo make SYSCONFDIR=/etc PREFIX=/usr
         sudo make SYSCONFDIR=/etc PREFIX=/usr install_base
