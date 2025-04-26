@@ -119,7 +119,9 @@ runs:
           docbook2x \
           mktorrent \
           doxygen \
-          zstd
+          zstd \
+          s3cmd \
+          xorriso
         sudo python3 -m pip install meson
         sudo python3 -m pip install ninja
     - id: install-pacman
