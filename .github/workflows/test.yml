@@ -1,6 +1,15 @@
 name: 'build-test'
 on:
   pull_request:
+  workflow_dispatch:
+    # You can define inputs here if your workflow requires any parameters
+    # For example:
+    # inputs:
+    #   logLevel:
+    #     description: 'Log level'
+    #     required: true
+    #     default: 'warning'
+
 
 env:
   ##### EDIT ME #####
