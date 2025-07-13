@@ -19,14 +19,14 @@ jobs:
           gh release delete ${{ env.version }} -y --repo ${{ github.repository }} || exit 0
           git push --delete origin ${{ env.version }}
   build-release:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     needs: [cleanup]
     strategy:
       matrix:
         ##### EDIT ME #####
-        EDITION: [xfce]
-        BRANCH: [stable]
-        SCOPE: [minimal]
+        EDITION: [gnome, kde, xfce]
+        BRANCH: [stable, testing, unstable]
+        SCOPE: [minimal, full]
         ###################
     steps:
       - uses: styfle/cancel-workflow-action@85880fa0301c86cca9da44039ee3bb12d3bedbfa # 0.12.1
