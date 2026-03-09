@@ -168,7 +168,7 @@ runs:
         pushd archlinux-keyring
           #wget https://archlinux.org/packages/core/any/archlinux-keyring/download -O /tmp/archlinux-keyring.tar.zst
           # temp solution until Arch infra gets fixed
-          wget https://mirrors.manjaro.org/repo/pool/sync/archlinux-keyring-20260107-2-any.pkg.tar.zst -O /tmp/archlinux-keyring.tar.zst
+          wget https://mirrors.manjaro.org/repo/pool/sync/archlinux-keyring-20260301-1-any.pkg.tar.zst -O /tmp/archlinux-keyring.tar.zst
           tar --use-compress-program=unzstd --strip-components=4 --wildcards -xvf /tmp/archlinux-keyring.tar.zst usr/share/pacman/keyrings/*
           sudo install -m0644 archlinux.gpg /usr/share/pacman/keyrings/
           sudo install -m0644 archlinux-trusted /usr/share/pacman/keyrings/
