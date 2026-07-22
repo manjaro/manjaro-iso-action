@@ -43,7 +43,7 @@ inputs:
   build-mirror:
     description: 'specific build mirror to use'
     required: false
-    default: https://mirror.easyname.at/manjaro
+    default: https://repo.manjaro.org/repo
   gpg-secret-key-base64:
     description: 'base64 encoded gpg secret key (without a passphrase) to sign the zip (if set)'
     required: false
@@ -263,7 +263,7 @@ runs:
         sudo sed -i -e 's|iso_name=$(get_osid)|iso_name=manjaro|g' /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e "s|dist_release=\$(get_release)|dist_release=${VERSION:-$DISTRIB_RELEASE}|g" /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e "s|dist_codename=\$(get_codename)|dist_codename=\"${CODE_NAME:-$DISTRIB_CODENAME}\"|g" /usr/lib/manjaro-tools/util.sh
-        sudo sed -i -e "s|build_mirror='https://mirror.easyname.at/manjaro'|build_mirror=\'${BUILD_MIRROR}\'|g" /usr/lib/manjaro-tools/util.sh
+        sudo sed -i -e "s|build_mirror='https://repo.manjaro.org/repo'|build_mirror=\'${BUILD_MIRROR}\'|g" /usr/lib/manjaro-tools/util.sh
         
         sudo buildiso ${SCOPE:+-f} -p $EDITION -b $BRANCH -k $KERNEL ${OFFICE:+-o}
 
