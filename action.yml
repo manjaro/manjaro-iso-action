@@ -44,6 +44,22 @@ inputs:
     description: 'specific build mirror to use'
     required: false
     default: https://mirror.easyname.at/manjaro
+  pacman-version:
+    description: 'pacman version to build ("latest" to auto-detect)'
+    required: false
+    default: latest
+  pacman-detect-urls:
+    description: 'space separated fallback URLs used to resolve latest pacman version when pacman-version=latest (expects directory index with pacman-package-manager_<ver>.orig.tar.*)'
+    required: false
+    default: "https://ftp.debian.org/debian/pool/main/p/pacman-package-manager/ https://ftp.ubuntu.com/ubuntu/pool/universe/p/pacman-package-manager/"
+  pacman-source-urls:
+    description: 'space separated fallback URLs to download pacman source tarball; use {version} placeholder'
+    required: false
+    default: "https://ftp.debian.org/debian/pool/main/p/pacman-package-manager/pacman-package-manager_{version}.orig.tar.xz https://ftp.debian.org/debian/pool/main/p/pacman-package-manager/pacman-package-manager_{version}.orig.tar.gz https://ftp.ubuntu.com/ubuntu/pool/universe/p/pacman-package-manager/pacman-package-manager_{version}.orig.tar.xz https://ftp.ubuntu.com/ubuntu/pool/universe/p/pacman-package-manager/pacman-package-manager_{version}.orig.tar.gz https://gitlab.archlinux.org/pacman/pacman/-/releases/v{version}/downloads/pacman-{version}.tar.xz https://sources.archlinux.org/other/pacman/pacman-{version}.tar.xz"
+  archlinux-core-db-urls:
+    description: 'space separated fallback URLs to Arch core.db (x86_64) used to resolve the latest archlinux-keyring package'
+    required: false
+    default: "https://mirrors.edge.kernel.org/archlinux/core/os/x86_64/core.db https://mirrors.ocf.berkeley.edu/archlinux/core/os/x86_64/core.db"
   gpg-secret-key-base64:
     description: 'base64 encoded gpg secret key (without a passphrase) to sign the zip (if set)'
     required: false
@@ -127,16 +143,122 @@ runs:
           xorriso
         sudo python3 -m pip install meson
         sudo python3 -m pip install ninja
+
     - id: install-pacman
       shell: bash
       env:
-        PACMAN_VERSION: 6.0.2
+        PACMAN_VERSION: ${{ inputs.pacman-version }}
+        PACMAN_DETECT_URLS: ${{ inputs.pacman-detect-urls }}
+        PACMAN_SOURCE_URLS: ${{ inputs.pacman-source-urls }}
       run: |
-        sudo git clone --depth 1 https://gitlab.manjaro.org/packages/core/pacman.git
+        # Helper functions for reliable downloads
+        retry_git_clone() {
+          local max_attempts=5 attempt=1 delay=10
+          until sudo git clone --depth 1 "$@"; do
+            if [ $attempt -ge $max_attempts ]; then
+              echo "ERROR: git clone failed after $max_attempts attempts" >&2
+              return 1
+            fi
+            echo "git clone failed, retrying in ${delay}s (attempt $attempt/$max_attempts)..." >&2
+            sleep $delay
+            delay=$((delay * 2))
+            attempt=$((attempt + 1))
+          done
+        }
+
+        retry_wget() {
+          local output="$1" url="$2"
+          shift 2
+          local max_attempts=5 attempt=1 delay=10
+          rm -f "$output"
+          while [ $attempt -le $max_attempts ]; do
+            if wget --timeout=30 -O "$output" "$@" "$url"; then
+              return 0
+            fi
+            echo "wget failed, retrying in ${delay}s (attempt $attempt/$max_attempts)..." >&2
+            sleep $delay
+            delay=$((delay * 2))
+            attempt=$((attempt + 1))
+          done
+          echo "ERROR: wget failed after $max_attempts attempts" >&2
+          return 1
+        }
+
+        retry_curl() {
+          local url="$1"
+          shift
+          local max_attempts=5 attempt=1 delay=10
+          while [ $attempt -le $max_attempts ]; do
+            if curl --retry 5 --retry-delay 10 --retry-connrefused -fsSL "$@" "$url"; then
+              return 0
+            fi
+            echo "curl failed, retrying in ${delay}s (attempt $attempt/$max_attempts)..." >&2
+            sleep $delay
+            delay=$((delay * 2))
+            attempt=$((attempt + 1))
+          done
+          echo "ERROR: curl failed after $max_attempts attempts" >&2
+          return 1
+        }
+
+        retry_git_clone https://gitlab.manjaro.org/packages/core/pacman.git
         pushd pacman
-          sudo wget https://sources.archlinux.org/other/pacman/pacman-${PACMAN_VERSION}.tar.xz
-          sudo tar -xvf pacman-${PACMAN_VERSION}.tar.xz
-          pushd pacman-${PACMAN_VERSION}
+          UA="Mozilla/5.0"
+          PACMAN_VER="${PACMAN_VERSION}"
+
+          # Auto-detect latest if requested
+          if [ -z "${PACMAN_VER}" ] || [ "${PACMAN_VER}" = "latest" ]; then
+            echo "## pacman: resolving latest version"
+            PACMAN_VER=""
+            for u in ${PACMAN_DETECT_URLS}; do
+              echo "## pacman: detect from ${u}"
+              idx="$(retry_curl "${u}" -A "${UA}" 2>/dev/null || true)"
+              [ -z "${idx}" ] && continue
+              ver="$(printf '%s' "${idx}" \
+                | grep -Eo 'pacman-package-manager_[0-9]+\.[0-9]+\.[0-9]+\.orig\.tar\.(xz|gz|bz2)' \
+                | sed -E 's/^pacman-package-manager_([0-9]+\.[0-9]+\.[0-9]+)\.orig\.tar\..*$/\1/' \
+                | sort -V \
+                | tail -n 1 \
+                || true)"
+              if [ -n "${ver}" ]; then
+                PACMAN_VER="${ver}"
+                break
+              fi
+            done
+            if [ -z "${PACMAN_VER}" ]; then
+              echo "ERROR: Could not resolve latest pacman version" >&2
+              exit 1
+            fi
+          fi
+
+          echo "## pacman: version ${PACMAN_VER}"
+
+          # Download source tarball from fallback list
+          dl_ok=0
+          tmp_tar="/tmp/pacman-src.tar.xz"
+          rm -f "${tmp_tar}"
+          for tmpl in ${PACMAN_SOURCE_URLS}; do
+            url="${tmpl//\{version\}/${PACMAN_VER}}"
+            echo "## pacman: trying ${url}"
+            if retry_wget "${tmp_tar}" "${url}" --user-agent="${UA}" -q; then
+              dl_ok=1
+              break
+            fi
+          done
+          if [ "${dl_ok}" -ne 1 ]; then
+            echo "ERROR: Could not download pacman source for ${PACMAN_VER}" >&2
+            exit 1
+          fi
+
+          # Determine top directory safely (no SIGPIPE issue)
+          topdir="$(tar -tf "${tmp_tar}" 2>/dev/null | sed -n '1p' | cut -d/ -f1)"
+          if [ -z "${topdir}" ]; then
+            echo "ERROR: Could not determine source top directory" >&2
+            exit 1
+          fi
+
+          sudo tar -xvf "${tmp_tar}"
+          pushd "${topdir}"
             sudo meson --prefix=/usr \
                       --buildtype=plain \
                       -Ddoc=disabled \
@@ -147,28 +269,110 @@ runs:
             sudo meson compile -C build
             sudo meson install -C build
           popd
+
           sudo install -m644 pacman.conf /etc/pacman.conf
           sudo install -m644 makepkg.conf /etc/
           sudo mkdir -p /etc/pacman.d
           sudo touch /etc/pacman.d/mirrorlist
+
+          # Pacman 7+ requires alpm user/group
+          sudo install -dm755 /var/empty
+          getent group alpm >/dev/null 2>&1 || sudo groupadd -r alpm
+          id -u alpm >/dev/null 2>&1 || sudo useradd -r -g alpm -M -d /var/empty -s /usr/sbin/nologin alpm
         popd
+
     - id: install-keyrings
       shell: bash
       run: |
+        retry_git_clone() {
+          local max_attempts=5 attempt=1 delay=10
+          until sudo git clone --depth 1 "$@"; do
+            if [ $attempt -ge $max_attempts ]; then
+              echo "ERROR: git clone failed after $max_attempts attempts" >&2
+              return 1
+            fi
+            echo "git clone failed, retrying in ${delay}s (attempt $attempt/$max_attempts)..." >&2
+            sleep $delay
+            delay=$((delay * 2))
+            attempt=$((attempt + 1))
+          done
+        }
+
+        retry_wget() {
+          local output="$1" url="$2"
+          shift 2
+          local max_attempts=5 attempt=1 delay=10
+          rm -f "$output"
+          while [ $attempt -le $max_attempts ]; do
+            if wget --timeout=30 -O "$output" "$@" "$url"; then
+              return 0
+            fi
+            echo "wget failed, retrying in ${delay}s (attempt $attempt/$max_attempts)..." >&2
+            sleep $delay
+            delay=$((delay * 2))
+            attempt=$((attempt + 1))
+          done
+          echo "ERROR: wget failed after $max_attempts attempts" >&2
+          return 1
+        }
+
         sudo install -dm755 /usr/share/pacman/keyrings/
 
-        sudo git clone --depth 1 https://gitlab.manjaro.org/packages/core/manjaro-keyring.git
+        # Manjaro keyring
+        retry_git_clone https://gitlab.manjaro.org/packages/core/manjaro-keyring.git
         pushd manjaro-keyring
           sudo install -m0644 manjaro.gpg /usr/share/pacman/keyrings/
           sudo install -m0644 manjaro-trusted /usr/share/pacman/keyrings/
           sudo install -m0644 manjaro-revoked /usr/share/pacman/keyrings/
         popd
 
+        # Dynamically resolve latest archlinux-keyring
         mkdir -p archlinux-keyring
         pushd archlinux-keyring
-          #wget https://archlinux.org/packages/core/any/archlinux-keyring/download -O /tmp/archlinux-keyring.tar.zst
-          # temp solution until Arch infra gets fixed
-          wget https://mirrors.manjaro.org/repo/pool/sync/archlinux-keyring-20260707.1-1-any.pkg.tar.zst -O /tmp/archlinux-keyring.tar.zst
+          ARCH_CORE_DB_URLS="${{ inputs.archlinux-core-db-urls }}"
+          UA="Mozilla/5.0"
+          tmpdb="$(mktemp)"
+          tmpdesc="$(mktemp)"
+          pkgfile=""
+
+          for dburl in ${ARCH_CORE_DB_URLS}; do
+            echo "## archlinux-keyring: trying core.db ${dburl}"
+            if retry_wget "${tmpdb}" "${dburl}" --user-agent="${UA}" -q; then
+              entry="$(bsdtar -tf "${tmpdb}" 2>/dev/null | grep -E '^archlinux-keyring-[^/]+/desc$' | head -n 1 || true)"
+              if [ -n "${entry}" ]; then
+                bsdtar -xOf "${tmpdb}" "${entry}" > "${tmpdesc}" 2>/dev/null || true
+                pkgfile="$(awk '$0=="%FILENAME%"{getline; print; exit}' "${tmpdesc}" || true)"
+                if [ -n "${pkgfile}" ]; then
+                  echo "## archlinux-keyring: latest package ${pkgfile}"
+                  break
+                fi
+              fi
+            fi
+          done
+
+          if [ -z "${pkgfile}" ]; then
+            echo "ERROR: Could not resolve latest archlinux-keyring from core.db" >&2
+            exit 1
+          fi
+
+          dl_ok=0
+          for dburl in ${ARCH_CORE_DB_URLS}; do
+            base="${dburl%/*}"
+            pkgurl="${base}/${pkgfile}"
+            echo "## archlinux-keyring: trying package ${pkgurl}"
+            if retry_wget "/tmp/archlinux-keyring.tar.zst" "${pkgurl}" --user-agent="${UA}" -q; then
+              dl_ok=1
+              break
+            fi
+          done
+
+          rm -f "${tmpdb}" "${tmpdesc}"
+
+          if [ "${dl_ok}" -ne 1 ]; then
+            echo "ERROR: Could not download ${pkgfile} from configured mirrors" >&2
+            exit 1
+          fi
+
           tar --use-compress-program=unzstd --strip-components=4 --wildcards -xvf /tmp/archlinux-keyring.tar.zst usr/share/pacman/keyrings/*
           sudo install -m0644 archlinux.gpg /usr/share/pacman/keyrings/
           sudo install -m0644 archlinux-trusted /usr/share/pacman/keyrings/
@@ -178,10 +382,13 @@ runs:
         sudo pacman-key --init
         sudo pacman-key --populate archlinux manjaro
 
+        # Trust additional GPG keys with fallback
         for gpg_key in ${{ inputs.additional-trusted-gpg }}; do
-          sudo pacman-key --keyserver keys.openpgp.org --recv-key $gpg_key
+          sudo pacman-key --keyserver keys.openpgp.org --recv-key $gpg_key || \
+          sudo pacman-key --keyserver keyserver.ubuntu.com --recv-key $gpg_key
           sudo pacman-key --lsign-key $gpg_key
         done
+
     - id: install-arch-install-scripts
       shell: bash
       env:
@@ -193,7 +400,9 @@ runs:
         sudo make -C arch-install-scripts-${VERSION} check
         sudo make -C arch-install-scripts-${VERSION} PREFIX=/usr install
         
-        sudo wget https://gitlab.manjaro.org/applications/pacman-mirrors/-/tree/master/data/etc/pacman-mirrors.conf -O /etc/pacman-mirrors.conf
+        # Fixed URL (was pointing to /tree/master, now raw)
+        sudo wget https://gitlab.manjaro.org/applications/pacman-mirrors/-/raw/master/data/etc/pacman-mirrors.conf -O /etc/pacman-mirrors.conf
+
     - id: install-calamares-tools
       shell: bash
       run: |
@@ -202,6 +411,7 @@ runs:
         cd calamares-tools
         sudo install -d /usr/share/calamares/
         sudo cp -rv schemas/ /usr/share/calamares/
+
     - id: install-mkinitcpio
       shell: bash
       env:
@@ -211,6 +421,7 @@ runs:
         sudo tar -xf mkinitcpio-v${VERSION}.tar.gz
         sudo make -C mkinitcpio-v${VERSION} install
         sudo sed -i -e 's|File|Path|' /usr/share/libalpm/hooks/*hook
+
     - id: install-manjaro-tools
       shell: bash
       env:
@@ -226,12 +437,14 @@ runs:
           echo "## adding repo [${CUSTOM_REPO}]"
           sudo sed -i -e "s/\[core\]/\[${CUSTOM_REPO}\]\nSigLevel = PackageRequired\nInclude = \/etc\/pacman\.d\/mirrorlist\n\n\[core\]/" /usr/share/manjaro-tools/pacman-multilib.conf
         fi
+
     - id: checkout-iso-profiles
       shell: bash
       env:
         REPO: ${{ inputs.iso-profiles-repo }}
         BRANCH: ${{ inputs.iso-profiles-branch }}
       run: sudo git clone ${BRANCH:+--branch ${BRANCH}} --depth 1 ${REPO} iso-profiles
+
     - id: cleanup_space_workaround
       shell: bash
       run: |
@@ -240,6 +453,7 @@ runs:
         sudo rm -rf /opt/ghc
         sudo rm -rf "/usr/local/share/boost"
         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
     - id: image-build
       shell: bash
       env:
@@ -276,6 +490,7 @@ runs:
 
         FILE_PKG=$(find /var/cache/manjaro-tools/iso -type f -name "*-pkgs.txt" -exec stat -c '%Y %n' {} \; | sort -nr | awk 'NR==1 {print $2}')
         mv $FILE_PKG ./${TARGET_ISO_PATH}.pkgs
+
     - id: hash
       shell: bash
       run: |
@@ -283,10 +498,10 @@ runs:
         sha1sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha1
         sha256sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha256
         sha512sum ${{ steps.image-build.outputs.file-path }} >${{ steps.image-build.outputs.file-path }}.sha512
+
     - id: gpg_sign
       shell: bash
       run: |
-        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
         if [ -z "${{ inputs.gpg-secret-key-base64 }}" ]; then 
           echo "## no gpg secret given"
           exit 0
@@ -294,6 +509,7 @@ runs:
         echo "## gpg signing"
         cat <(echo -e "${{ inputs.gpg-secret-key-base64 }}" | base64 --decode) | gpg --batch --import &>/dev/null
         gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg-passphrase }}" --detach-sign ./${{ steps.image-build.outputs.file-path }}
+
     - id: upload-prepare
       shell: bash -O extglob {0}
       run: |
@@ -304,12 +520,12 @@ runs:
         ssh-agent -a /tmp/ssh_agent.sock > /dev/null
         echo "upload-files=./${{ steps.image-build.outputs.file-path }}+(|.sha*|.pkgs|.sig|.torrent)" >> $GITHUB_OUTPUT
         mkdir -p ${{ inputs.edition }}/${{ inputs.version }}
+
     - name: upload-sourceforge
       shell: bash -O extglob {0}
       env:
         SSH_AUTH_SOCK: /tmp/ssh_agent.sock
       run: |
-        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
         if [ -z "${{ inputs.sf-project }}" ] || [ -z "${{ inputs.sf-user }}" ] || [ -z "${{ inputs.sf-key }}" ]; then 
           echo "## not (all) credentials given for sourceforge upload"
           exit 0
@@ -327,12 +543,12 @@ runs:
         ## upload
         rsync -vaP --stats -e ssh ${{ steps.upload-prepare.outputs.upload-files }} \
           ${{ inputs.sf-user }}@frs.sourceforge.net:/home/frs/project/${{ inputs.sf-project }}/${{ inputs.edition }}/${{ inputs.version }}/
+
     - id: upload-github-release
       shell: bash -O extglob {0}
       env:
         LIMIT_MB: '2000'
       run: |
-        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
         if [ -z "${{ inputs.release-tag }}" ]; then 
           echo "## no release tag given"
           exit 0
@@ -356,10 +572,10 @@ runs:
           gh release upload ${{ inputs.release-tag }} --repo ${{ github.repository }} --clobber \
             ./${{ steps.image-build.outputs.file-path }}+(.z*|.sha*|.pkgs|.sig|.torrent)
         fi
+
     - name: upload-cdn77-s3
       shell: bash -O extglob {0}
       run: |
-        # if is not yet supported in composite https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md#if-condition
         if [ -z "${{ inputs.s3-cfg }}" ]; then
           echo "## credentials for cdn77 S3 upload not provided. Skipping."
           exit 0
