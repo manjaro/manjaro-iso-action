@@ -5,7 +5,7 @@ inputs:
   iso-profiles-repo:
     description: 'iso profiles to clone'
     required: false
-    default: 'https://gitlab.manjaro.org/profiles-and-settings/iso-profiles'
+    default: 'https://code.manjaro.org/profiles/iso-profiles'
   iso-profiles-branch:
     description: 'branch of the iso profiles to check out'
     required: false
@@ -26,7 +26,7 @@ inputs:
   kernel:
     description: 'kernel version'
     required: false
-    default: linux510
+    default: linux618
   code-name:
     description: 'manjaro code-name (upstream if not given)'
     required: false
@@ -67,7 +67,7 @@ inputs:
   build-mirror:
     description: 'specific build mirror to use'
     required: false
-    default: https://mirror.easyname.at/manjaro
+    default: https://mirrors.manjaro.org/repo
   gpg-secret-key-base64:
     description: 'base64 encoded gpg secret key (without a passphrase) to sign the zip (if set)'
     required: false
@@ -156,37 +156,40 @@ runs:
       env:
         PACMAN_VERSION: 6.0.2
       run: |
-        sudo git clone --depth 1 https://gitlab.manjaro.org/packages/core/pacman.git
-        pushd pacman
-          sudo wget https://sources.archlinux.org/other/pacman/pacman-${PACMAN_VERSION}.tar.xz
-          sudo tar -xvf pacman-${PACMAN_VERSION}.tar.xz
-          pushd pacman-${PACMAN_VERSION}
-            sudo meson --prefix=/usr \
-                      --buildtype=plain \
-                      -Ddoc=disabled \
-                      -Ddoxygen=enabled \
-                      -Dscriptlet-shell=/usr/bin/bash \
-                      -Dldconfig=/usr/bin/ldconfig \
-                      build
-            sudo meson compile -C build
-            sudo meson install -C build
-          popd
-          sudo install -m644 pacman.conf /etc/pacman.conf
-          sudo install -m644 makepkg.conf /etc/
-          sudo mkdir -p /etc/pacman.d
-          sudo touch /etc/pacman.d/mirrorlist
+        sudo wget https://code.manjaro.org/packages/PKGBUILDs/raw/branch/main/core/pacman/pacman.conf
+        sudo wget https://code.manjaro.org/packages/PKGBUILDs/raw/branch/main/core/pacman/makepkg.conf
+        sudo wget https://sources.archlinux.org/other/pacman/pacman-${PACMAN_VERSION}.tar.xz
+        sudo tar -xvf pacman-${PACMAN_VERSION}.tar.xz
+        pushd pacman-${PACMAN_VERSION}
+        ## sudo patch -p1 -i ../pacman-sync-first-option.patch
+        sudo meson --prefix=/usr \
+                    --buildtype=plain \
+                    -Ddoc=disabled \
+                    -Ddoxygen=enabled \
+                    -Dscriptlet-shell=/usr/bin/bash \
+                    -Dldconfig=/usr/bin/ldconfig \
+                    build
+        sudo meson compile -C build
+        sudo meson install -C build
         popd
+        sudo install -m644 pacman.conf /etc/pacman.conf
+        sudo install -m644 makepkg.conf /etc/
+        sudo mkdir -p /etc/pacman.d
+        sudo touch /etc/pacman.d/mirrorlist
     - id: install-keyrings
       shell: bash
       run: |
         sudo install -dm755 /usr/share/pacman/keyrings/
 
-        sudo git clone --depth 1 https://gitlab.manjaro.org/packages/core/manjaro-keyring.git
-        pushd manjaro-keyring
-          sudo install -m0644 manjaro.gpg /usr/share/pacman/keyrings/
-          sudo install -m0644 manjaro-trusted /usr/share/pacman/keyrings/
-          sudo install -m0644 manjaro-revoked /usr/share/pacman/keyrings/
-        popd
+        sudo wget https://code.manjaro.org/packages/PKGBUILDs/raw/branch/main/core/manjaro-keyring/manjaro.gpg
+        sudo wget https://code.manjaro.org/packages/PKGBUILDs/raw/branch/main/core/manjaro-keyring/manjaro-revoked
+        sudo wget https://code.manjaro.org/packages/PKGBUILDs/raw/branch/main/core/manjaro-keyring/manjaro-trusted
+        sudo install -m0644 manjaro.gpg /usr/share/pacman/keyrings/
+        sudo install -m0644 manjaro-revoked /usr/share/pacman/keyrings/
+        sudo install -m0644 manjaro-trusted /usr/share/pacman/keyrings/
+        sudo rm manjaro.gpg
+        sudo rm manjaro-revoked
+        sudo rm manjaro-trusted
 
         mkdir -p archlinux-keyring
         pushd archlinux-keyring
@@ -217,11 +220,11 @@ runs:
         sudo make -C arch-install-scripts-${VERSION} check
         sudo make -C arch-install-scripts-${VERSION} PREFIX=/usr install
         
-        sudo wget https://gitlab.manjaro.org/applications/pacman-mirrors/-/tree/master/data/etc/pacman-mirrors.conf -O /etc/pacman-mirrors.conf
+        sudo wget https://code.manjaro.org/applications/pacman-mirrors/raw/branch/master/data/etc/pacman-mirrors.conf -O /etc/pacman-mirrors.conf
     - id: install-calamares-tools
       shell: bash
       run: |
-        sudo git clone --depth 1 https://gitlab.manjaro.org/applications/calamares-tools.git
+        sudo git clone --depth 1 https://code.manjaro.org/applications/calamares-tools.git
         
         cd calamares-tools
         sudo install -d /usr/share/calamares/
@@ -242,7 +245,7 @@ runs:
         CUSTOM_REPO_SIG: ${{ inputs.custom-repo-sig }}
         CUSTOM_REPO_URL: ${{ inputs.custom-repo-url }}
       run: |
-        sudo git clone --depth 1 https://gitlab.manjaro.org/tools/development-tools/manjaro-tools.git
+        sudo git clone --depth 1 https://code.manjaro.org/tools/manjaro-tools.git
         cd manjaro-tools
         sudo make SYSCONFDIR=/etc PREFIX=/usr
         sudo make SYSCONFDIR=/etc PREFIX=/usr install_base
