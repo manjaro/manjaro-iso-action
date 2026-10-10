@@ -1,0 +1,38 @@
+name: Sync master from Manjaro Github (safe)
+
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout GitHub repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Add Github remote
+        run: |
+          git remote add github https://github.com/manjaro/manjaro-iso-action.git || true
+          git fetch github
+
+      - name: Configure git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge Github main into GitHub main
+        run: |
+          git checkout main
+          git merge github/main --no-edit || true
+
+      - name: Push changes to GitHub
+        run: |
+          git push origin main
