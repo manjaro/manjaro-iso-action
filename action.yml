@@ -44,6 +44,14 @@ inputs:
     description: 'specific build mirror to use'
     required: false
     default: https://mirrors.manjaro.org/repo
+  pkgbuilds-branch:
+    description: 'branch of the PKGBUILDs repo to check out'
+    required: false
+    default: 'main'
+  pacman-mirrors-branch:
+    description: 'branch of the pacman-mirrors repo to check out'
+    required: false
+    default: 'master'
   gpg-secret-key-base64:
     description: 'base64 encoded gpg secret key (without a passphrase) to sign the zip (if set)'
     required: false
@@ -129,13 +137,20 @@ runs:
         sudo python3 -m pip install ninja
     - id: checkout-packaging-sources
       shell: bash
+      env:
+        PKGBUILDS_BRANCH: ${{ inputs.pkgbuilds-branch }}
+        PACMAN_MIRRORS_BRANCH: ${{ inputs.pacman-mirrors-branch }}
       run: |
-        # Single integrity-verified source for all packaging metadata.
+        # Single integrity-verified source for packaging metadata.
         # Replaces 7 unauthenticated raw/branch/* wget/curl operations with
-        # Git object integrity (content-addressed, auditable, pinnable).
+        # two git clones. Git provides content-addressed object integrity and
+        # an auditable history; the branch is explicit and overridable via
+        # the pkgbuilds-branch / pacman-mirrors-branch inputs.
         rm -rf "$GITHUB_WORKSPACE/PKGBUILDs" "$GITHUB_WORKSPACE/pacman-mirrors"
-        git clone --depth 1 https://code.manjaro.org/packages/PKGBUILDs.git "$GITHUB_WORKSPACE/PKGBUILDs"
-        git clone --depth 1 https://code.manjaro.org/applications/pacman-mirrors.git "$GITHUB_WORKSPACE/pacman-mirrors"
+        git clone --depth 1 --branch "${PKGBUILDS_BRANCH}" \
+          https://code.manjaro.org/packages/PKGBUILDs.git "$GITHUB_WORKSPACE/PKGBUILDs"
+        git clone --depth 1 --branch "${PACMAN_MIRRORS_BRANCH}" \
+          https://code.manjaro.org/applications/pacman-mirrors.git "$GITHUB_WORKSPACE/pacman-mirrors"
     - id: install-pacman
       shell: bash
       env:
