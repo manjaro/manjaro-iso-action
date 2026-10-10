@@ -127,13 +127,21 @@ runs:
           xorriso
         sudo python3 -m pip install meson
         sudo python3 -m pip install ninja
+    - id: checkout-packaging-sources
+      shell: bash
+      run: |
+        # Single integrity-verified source for all packaging metadata.
+        # Replaces 7 unauthenticated raw/branch/* wget/curl operations with
+        # Git object integrity (content-addressed, auditable, pinnable).
+        rm -rf "$GITHUB_WORKSPACE/PKGBUILDs" "$GITHUB_WORKSPACE/pacman-mirrors"
+        git clone --depth 1 https://code.manjaro.org/packages/PKGBUILDs.git "$GITHUB_WORKSPACE/PKGBUILDs"
+        git clone --depth 1 https://code.manjaro.org/applications/pacman-mirrors.git "$GITHUB_WORKSPACE/pacman-mirrors"
     - id: install-pacman
       shell: bash
       env:
         PACMAN_VERSION: 6.0.2
+        PKGBUILDS_DIR: ${{ github.workspace }}/PKGBUILDs
       run: |
-        sudo wget https://code.manjaro.org/packages/PKGBUILDs/raw/branch/main/core/pacman/pacman.conf
-        sudo wget https://code.manjaro.org/packages/PKGBUILDs/raw/branch/main/core/pacman/makepkg.conf
         sudo wget https://sources.archlinux.org/other/pacman/pacman-${PACMAN_VERSION}.tar.xz
         sudo tar -xvf pacman-${PACMAN_VERSION}.tar.xz
         pushd pacman-${PACMAN_VERSION}
@@ -148,24 +156,20 @@ runs:
         sudo meson compile -C build
         sudo meson install -C build
         popd
-        sudo install -m644 pacman.conf /etc/pacman.conf
-        sudo install -m644 makepkg.conf /etc/
+        sudo install -m644 "${PKGBUILDS_DIR}/core/pacman/pacman.conf" /etc/pacman.conf
+        sudo install -m644 "${PKGBUILDS_DIR}/core/pacman/makepkg.conf" /etc/
         sudo mkdir -p /etc/pacman.d
         sudo touch /etc/pacman.d/mirrorlist
     - id: install-keyrings
       shell: bash
+      env:
+        PKGBUILDS_DIR: ${{ github.workspace }}/PKGBUILDs
       run: |
         sudo install -dm755 /usr/share/pacman/keyrings/
 
-        sudo wget https://code.manjaro.org/packages/PKGBUILDs/raw/branch/main/core/manjaro-keyring/manjaro.gpg
-        sudo wget https://code.manjaro.org/packages/PKGBUILDs/raw/branch/main/core/manjaro-keyring/manjaro-revoked
-        sudo wget https://code.manjaro.org/packages/PKGBUILDs/raw/branch/main/core/manjaro-keyring/manjaro-trusted
-        sudo install -m0644 manjaro.gpg /usr/share/pacman/keyrings/
-        sudo install -m0644 manjaro-revoked /usr/share/pacman/keyrings/
-        sudo install -m0644 manjaro-trusted /usr/share/pacman/keyrings/
-        sudo rm manjaro.gpg
-        sudo rm manjaro-revoked
-        sudo rm manjaro-trusted
+        sudo install -m0644 "${PKGBUILDS_DIR}/core/manjaro-keyring/manjaro.gpg" /usr/share/pacman/keyrings/
+        sudo install -m0644 "${PKGBUILDS_DIR}/core/manjaro-keyring/manjaro-revoked" /usr/share/pacman/keyrings/
+        sudo install -m0644 "${PKGBUILDS_DIR}/core/manjaro-keyring/manjaro-trusted" /usr/share/pacman/keyrings/
 
         mkdir -p archlinux-keyring
         pushd archlinux-keyring
@@ -189,14 +193,15 @@ runs:
       shell: bash
       env:
         VERSION: "27"
+        PACMAN_MIRRORS_DIR: ${{ github.workspace }}/pacman-mirrors
       run: |
         sudo wget https://github.com/archlinux/arch-install-scripts/archive/refs/tags/v${VERSION}.tar.gz -O arch-install-scripts.tar.gz
         sudo tar -xvf arch-install-scripts.tar.gz
         sudo make -C arch-install-scripts-${VERSION}
         sudo make -C arch-install-scripts-${VERSION} check
         sudo make -C arch-install-scripts-${VERSION} PREFIX=/usr install
-        
-        sudo wget https://code.manjaro.org/applications/pacman-mirrors/raw/branch/master/data/etc/pacman-mirrors.conf -O /etc/pacman-mirrors.conf
+
+        sudo install -m0644 "${PACMAN_MIRRORS_DIR}/data/etc/pacman-mirrors.conf" /etc/pacman-mirrors.conf
     - id: install-calamares-tools
       shell: bash
       run: |
@@ -254,13 +259,14 @@ runs:
         CODE_NAME: ${{ inputs.code-name }}
         OFFICE: ${{ inputs.office-chooser }}
         BUILD_MIRROR: ${{ inputs.build-mirror }}
+        PKGBUILDS_DIR: ${{ github.workspace }}/PKGBUILDs
       run: |
         echo "## building iso"
         [ "$SCOPE" == "minimal" ] && unset SCOPE && unset OFFICE
         [ "$OFFICE" == "false" ] && unset OFFICE
 
-        # source the version info from current release info
-        source <(curl -s https://code.manjaro.org/packages/PKGBUILDs/raw/branch/main/core/manjaro-release/lsb-release)
+        # source the version info from the integrity-verified PKGBUILDs checkout
+        source "${PKGBUILDS_DIR}/core/manjaro-release/lsb-release"
 
         sudo sed -i -e "s|dist_name=\$(get_distname)|dist_name=${DISTRIB_ID%Linux}|g" /usr/lib/manjaro-tools/util.sh
         sudo sed -i -e 's|iso_name=$(get_osid)|iso_name=manjaro|g' /usr/lib/manjaro-tools/util.sh
